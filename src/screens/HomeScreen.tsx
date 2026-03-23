@@ -26,10 +26,7 @@ import AccountIcon from '../assets/images/1 239.svg';
 export const HomeScreen: React.FC = () => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset =
-    Platform.OS === 'android'
-      ? (StatusBar.currentHeight ?? 0) + spacing.sm
-      : spacing.md;
+  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
 
   return (
     <SafeAreaView style={styles.safeArea}>
