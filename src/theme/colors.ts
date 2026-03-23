@@ -9,7 +9,7 @@ export const colors = {
   primary: '#3F6D5F',
   primaryPressed: '#355C50',
   accent: '#E6A935',
-  heroOverlay: 'rgba(16, 17, 15, 0.34)',
+  heroOverlay: 'rgba(16, 17, 15, 0.42)',
   error: '#C24B4B',
   success: '#2F7D60',
   neutralMessage: '#7E5A1F',
