@@ -49,26 +49,14 @@ export const useSignUpScreen = () => {
     });
   };
 
-  const onSignUpPress = () => {
-    if (!fullName.trim() || !email.trim() || !password.trim()) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please complete all sign up fields.',
-        tone: 'error',
-      });
-      return;
-    }
-
+  const onSignUpPress = (onSuccess?: () => void) => {
     setSubmitState('loading');
     setInlineMessage(null);
 
     signUpTimerRef.current = setTimeout(() => {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'TODO: Connect the sign-up API.',
-        tone: 'neutral',
-      });
-    }, 1100);
+      setSubmitState('idle');
+      onSuccess?.();
+    }, 550);
   };
 
   return {

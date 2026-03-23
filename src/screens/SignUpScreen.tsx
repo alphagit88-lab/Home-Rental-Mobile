@@ -28,10 +28,12 @@ import SignUpHeroImage from '../assets/images/Untitled design (3) 1.svg';
 
 type SignUpScreenProps = {
   onNavigateToSignIn?: () => void;
+  onNavigateToHome?: () => void;
 };
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({
   onNavigateToSignIn,
+  onNavigateToHome,
 }) => {
   const responsive = useResponsive();
   const signUp = useSignUpScreen();
@@ -147,7 +149,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                   <PrimaryActionButton
                     title="Sign Up"
                     loading={signUp.submitState === 'loading'}
-                    onPress={signUp.onSignUpPress}
+                    onPress={() => signUp.onSignUpPress(onNavigateToHome)}
                     trailingIcon={<ShapeIcon height={12} width={12} />}
                   />
                 </View>
