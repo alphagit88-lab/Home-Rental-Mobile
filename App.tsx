@@ -1,10 +1,11 @@
 import React from 'react';
 import {useState} from 'react';
+import {AppTab} from './src/components/AppBottomNav';
+import {BookingsScreen} from './src/screens/BookingsScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
 import {SignUpScreen} from './src/screens/SignUpScreen';
-import {AppTab} from './src/components/AppBottomNav';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'login' | 'signup' | 'home'>('login');
@@ -14,6 +15,16 @@ const App: React.FC = () => {
     if (activeTab === 'properties') {
       return (
         <PropertiesScreen activeTab={activeTab} onTabPress={setActiveTab} />
+      );
+    }
+
+    if (activeTab === 'bookings') {
+      return (
+        <BookingsScreen
+          activeTab={activeTab}
+          onSearchPress={() => setActiveTab('properties')}
+          onTabPress={setActiveTab}
+        />
       );
     }
 
