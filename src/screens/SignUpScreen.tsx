@@ -7,7 +7,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -15,24 +14,29 @@ import { AuthInput } from '../components/AuthInput';
 import { HeroBanner } from '../components/HeroBanner';
 import { InlineStateMessage } from '../components/InlineStateMessage';
 import { PrimaryActionButton } from '../components/PrimaryActionButton';
-import { useLoginScreen } from '../hooks/useLoginScreen';
+import { SelectField } from '../components/SelectField';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, fonts, radii, spacing } from '../theme';
-import LockIcon from '../assets/images/Lock.svg';
+import { useSignUpScreen } from '../hooks/useSignUpScreen';
+import { colors, fonts, spacing } from '../theme';
+import ProfileIcon from '../assets/images/Profile.svg';
+import RoleArrowIcon from '../assets/images/20 1.svg';
 import MessageIcon from '../assets/images/Message.svg';
-import ShapeIcon from '../assets/images/Shape.svg';
+import LockIcon from '../assets/images/Lock.svg';
 import HideIcon from '../assets/images/hide.svg';
-import HeroImage from '../assets/images/image.svg';
+import ShapeIcon from '../assets/images/Shape.svg';
+import SignUpHeroImage from '../assets/images/Untitled design (3) 1.svg';
 
-type LoginScreenProps = {
-  onNavigateToSignUp?: () => void;
+type SignUpScreenProps = {
+  onNavigateToSignIn?: () => void;
+  onNavigateToHome?: () => void;
 };
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({
-  onNavigateToSignUp,
+export const SignUpScreen: React.FC<SignUpScreenProps> = ({
+  onNavigateToSignIn,
+  onNavigateToHome,
 }) => {
   const responsive = useResponsive();
-  const login = useLoginScreen();
+  const signUp = useSignUpScreen();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -50,11 +54,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[
-              styles.page,
-            ]}
-          >
+          <View style={styles.page}>
             <View
               style={[
                 styles.contentWidth,
@@ -62,15 +62,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               ]}
             >
               <HeroBanner
-                backgroundImage={HeroImage}
-                heroState={login.heroState}
+                backgroundImage={SignUpHeroImage}
+                heroState={signUp.heroState}
                 height={responsive.heroHeight}
                 horizontalPadding={responsive.horizontalPadding}
                 greetingSize={responsive.heroGreetingSize}
                 titleSize={responsive.heroTitleSize}
                 taglineSize={responsive.heroTaglineSize}
                 maxWidth={responsive.maxContentWidth}
-                onRetry={login.onRetryHeroPress}
+                onRetry={signUp.onRetryHeroPress}
               />
 
               <View
@@ -89,109 +89,84 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     { fontSize: responsive.sectionTitleSize },
                   ]}
                 >
-                  Sign in
+                  Sign up
                 </Text>
 
                 <View style={styles.fields}>
+                  <SelectField
+                    height={responsive.inputHeight}
+                    leadingIcon={<ProfileIcon height={18} width={18} />}
+                    onPress={signUp.onRolePress}
+                    placeholder="Sign up as a"
+                    trailingIcon={<RoleArrowIcon height={16} width={16} />}
+                    value={signUp.signUpAs}
+                  />
+
+                  <AuthInput
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    height={responsive.inputHeight}
+                    leadingIcon={<ProfileIcon height={18} width={18} />}
+                    onChangeText={signUp.setFullName}
+                    placeholder="Full name"
+                    value={signUp.fullName}
+                  />
+
                   <AuthInput
                     autoCapitalize="none"
                     autoCorrect={false}
+                    height={responsive.inputHeight}
                     keyboardType="email-address"
                     leadingIcon={<MessageIcon height={18} width={18} />}
-                    onChangeText={login.setEmail}
+                    onChangeText={signUp.setEmail}
                     placeholder="abc@email.com"
-                    value={login.email}
-                    height={responsive.inputHeight}
+                    value={signUp.email}
                   />
 
                   <AuthInput
                     autoCapitalize="none"
                     autoCorrect={false}
+                    height={responsive.inputHeight}
                     leadingIcon={<LockIcon height={18} width={18} />}
-                    onChangeText={login.setPassword}
+                    onChangeText={signUp.setPassword}
                     placeholder="Your password"
-                    secureTextEntry={!login.passwordVisible}
+                    secureTextEntry={!signUp.passwordVisible}
                     trailingIcon={<HideIcon height={16} width={16} />}
                     onTrailingPress={() =>
-                      login.setPasswordVisible(!login.passwordVisible)
+                      signUp.setPasswordVisible(!signUp.passwordVisible)
                     }
-                    value={login.password}
-                    height={responsive.inputHeight}
+                    value={signUp.password}
                   />
                 </View>
 
-                <View
-                  style={[
-                    styles.optionsRow,
-                    responsive.isVerySmallPhone && styles.optionsRowStacked,
-                  ]}
-                >
-                  <View style={styles.rememberRow}>
-                    <Switch
-                      thumbColor={colors.white}
-                      trackColor={{
-                        false: '#D3CCC0',
-                        true: colors.primary,
-                      }}
-                      value={login.rememberMe}
-                      onValueChange={login.setRememberMe}
-                    />
-                    <Text
-                      style={[
-                        styles.optionText,
-                        { fontSize: responsive.bodySize },
-                      ]}
-                    >
-                      Remember Me
-                    </Text>
-                  </View>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={login.onForgotPasswordPress}
-                  >
-                    <Text
-                      style={[
-                        styles.forgotText,
-                        { fontSize: responsive.bodySize },
-                      ]}
-                    >
-                      Forgot Password?
-                    </Text>
-                  </Pressable>
-                </View>
-
-                {login.inlineMessage ? (
+                {signUp.inlineMessage ? (
                   <View style={styles.messageWrap}>
-                    <InlineStateMessage message={login.inlineMessage} />
+                    <InlineStateMessage message={signUp.inlineMessage} />
                   </View>
                 ) : null}
 
-                <PrimaryActionButton
-                  title="Sign In"
-                  loading={login.submitState === 'loading'}
-                  onPress={login.onSignInPress}
-                  trailingIcon={<ShapeIcon height={12} width={12} />}
-                />
+                <View style={styles.buttonWrap}>
+                  <PrimaryActionButton
+                    title="Sign Up"
+                    loading={signUp.submitState === 'loading'}
+                    onPress={() => signUp.onSignUpPress(onNavigateToHome)}
+                    trailingIcon={<ShapeIcon height={12} width={12} />}
+                  />
+                </View>
 
-                <View style={styles.signupRow}>
-                  <Text
-                    style={[styles.signupText, { fontSize: responsive.bodySize }]}
-                  >
-                    Don't have an account?
+                <View style={styles.signInRow}>
+                  <Text style={[styles.signInText, { fontSize: responsive.bodySize }]}>
+                    Already have an account?
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={onNavigateToSignUp ?? login.onSignUpPress}
+                    onPress={onNavigateToSignIn}
                   >
                     <Text
-                      style={[
-                        styles.signupLink,
-                        { fontSize: responsive.bodySize },
-                      ]}
+                      style={[styles.signInLink, { fontSize: responsive.bodySize }]}
                     >
                       {' '}
-                      Sign up
+                      Sign in
                     </Text>
                   </Pressable>
                 </View>
@@ -235,47 +210,25 @@ const styles = StyleSheet.create({
   fields: {
     gap: spacing.md,
   },
-  optionsRow: {
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  optionsRowStacked: {
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-  },
-  optionText: {
-    marginLeft: spacing.sm,
-    color: colors.textPrimary,
-    fontFamily: fonts.regular,
-    flexShrink: 1,
-  },
-  forgotText: {
-    color: colors.textPrimary,
-    fontFamily: fonts.medium,
-  },
   messageWrap: {
+    marginTop: spacing.lg,
     marginBottom: spacing.lg,
   },
-  signupRow: {
+  buttonWrap: {
+    marginTop: spacing.lg,
+  },
+  signInRow: {
     marginTop: spacing.lg,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     flexWrap: 'wrap',
   },
-  signupText: {
+  signInText: {
     color: colors.textPrimary,
     fontFamily: fonts.regular,
   },
-  signupLink: {
+  signInLink: {
     color: colors.primary,
     fontFamily: fonts.semibold,
   },

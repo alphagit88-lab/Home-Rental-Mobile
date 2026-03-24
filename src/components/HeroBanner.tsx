@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { HeroState } from '../hooks/useLoginScreen';
 import { colors, fonts, spacing } from '../theme';
-import HeroImage from '../assets/images/image.svg';
 import LineDivider from '../assets/images/Line 1.svg';
 
 type HeroBannerProps = {
@@ -20,6 +19,7 @@ type HeroBannerProps = {
   taglineSize: number;
   maxWidth: number;
   onRetry: () => void;
+  backgroundImage: React.ComponentType<any>;
 };
 
 export const HeroBanner: React.FC<HeroBannerProps> = ({
@@ -31,10 +31,11 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   taglineSize,
   maxWidth,
   onRetry,
+  backgroundImage: BackgroundImage,
 }) => {
   return (
     <View style={[styles.container, { height }]}>
-      <HeroImage
+      <BackgroundImage
         height="100%"
         preserveAspectRatio="xMidYMid slice"
         style={styles.heroImage}
