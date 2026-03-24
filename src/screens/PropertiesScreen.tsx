@@ -26,6 +26,7 @@ import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {PropertyBookingScreen} from './PropertyBookingScreen';
 import {PropertyDetailsScreen} from './PropertyDetailsScreen';
+import {PropertyPaymentScreen} from './PropertyPaymentScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 
@@ -93,6 +94,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
   const [detailVisible, setDetailVisible] = useState(false);
   const [bookingVisible, setBookingVisible] = useState(false);
+  const [paymentVisible, setPaymentVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [selectedSortBy, setSelectedSortBy] = useState('Nearest');
   const [selectedPropertyTypes, setSelectedPropertyTypes] =
@@ -126,12 +128,35 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     setBudgetRange(defaultBudgetRange);
   };
 
+  if (paymentVisible) {
+    return (
+      <PropertyPaymentScreen
+        activeTab={activeTab}
+        onBack={() => setPaymentVisible(false)}
+        onBookNow={() => {
+          setPaymentVisible(false);
+          setBookingVisible(false);
+          setDetailVisible(false);
+          onTabPress('bookings');
+        }}
+        onTabPress={tab => {
+          setPaymentVisible(false);
+          setBookingVisible(false);
+          setDetailVisible(false);
+          onTabPress(tab);
+        }}
+      />
+    );
+  }
+
   if (bookingVisible) {
     return (
       <PropertyBookingScreen
         activeTab={activeTab}
         onBack={() => setBookingVisible(false)}
+        onNext={() => setPaymentVisible(true)}
         onTabPress={tab => {
+          setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);
           onTabPress(tab);

@@ -22,12 +22,14 @@ import {colors, fonts, radii, spacing} from '../theme';
 type PropertyBookingScreenProps = {
   activeTab: AppTab;
   onBack: () => void;
+  onNext: () => void;
   onTabPress: (tab: AppTab) => void;
 };
 
 export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   activeTab,
   onBack,
+  onNext,
   onTabPress,
 }) => {
   const responsive = useResponsive();
@@ -130,7 +132,10 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
               />
             </View>
 
-            <Pressable accessibilityRole="button" style={styles.nextButton}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onNext}
+              style={styles.nextButton}>
               <Text style={styles.nextButtonText}>Next</Text>
             </Pressable>
           </View>
