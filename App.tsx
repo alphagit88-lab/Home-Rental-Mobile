@@ -1,6 +1,7 @@
 import React from 'react';
 import {useState} from 'react';
 import {AppTab} from './src/components/AppBottomNav';
+import {AccountScreen} from './src/screens/AccountScreen';
 import {BookingsScreen} from './src/screens/BookingsScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
@@ -23,6 +24,19 @@ const App: React.FC = () => {
         <BookingsScreen
           activeTab={activeTab}
           onSearchPress={() => setActiveTab('properties')}
+          onTabPress={setActiveTab}
+        />
+      );
+    }
+
+    if (activeTab === 'account') {
+      return (
+        <AccountScreen
+          activeTab={activeTab}
+          onLogout={() => {
+            setActiveTab('dashboard');
+            setScreen('login');
+          }}
           onTabPress={setActiveTab}
         />
       );
