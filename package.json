@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
+    "@react-native/metro-config": "0.73.5",
     "@types/react": "~18.2.14",
     "babel-preset-expo": "~10.0.0",
     "eslint-config-expo": "~7.0.0",
