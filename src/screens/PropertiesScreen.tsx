@@ -17,12 +17,14 @@ import MenuIcon from '../assets/images/menu 1.svg';
 import ProfilePic from '../assets/images/profile_pic.svg';
 import SearchIcon from '../assets/images/search 1.svg';
 import DateIcon from '../assets/images/clarity_date-line.svg';
+import RefreshIcon from '../assets/images/refreshing 1.svg';
 import BedIcon from '../assets/images/fluent_bed-24-filled.svg';
 import BathIcon from '../assets/images/fa-solid_bath.svg';
 import WifiIcon from '../assets/images/eva_wifi-fill.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {PropertyDetailsScreen} from './PropertyDetailsScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 
@@ -88,6 +90,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const [detailVisible, setDetailVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [selectedSortBy, setSelectedSortBy] = useState('Nearest');
   const [selectedPropertyTypes, setSelectedPropertyTypes] =
@@ -120,6 +123,19 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     setDistanceRange(defaultDistanceRange);
     setBudgetRange(defaultBudgetRange);
   };
+
+  if (detailVisible) {
+    return (
+      <PropertyDetailsScreen
+        activeTab={activeTab}
+        onBack={() => setDetailVisible(false)}
+        onTabPress={tab => {
+          setDetailVisible(false);
+          onTabPress(tab);
+        }}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -174,6 +190,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             <View style={styles.cardList}>
               {propertyCards.map(card => (
                 <PropertyCard
+                  onAvailabilityPress={() => setDetailVisible(true)}
                   key={card.id}
                   baths={card.baths}
                   bedrooms={card.bedrooms}
@@ -229,6 +246,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                         accessibilityRole="button"
                         onPress={resetFilters}
                         style={styles.resetButton}>
+                        <RefreshIcon height={12} width={12} />
                         <Text style={styles.resetButtonText}>Reset</Text>
                       </Pressable>
                     </View>
@@ -423,12 +441,14 @@ const DateInput: React.FC<DateInputProps> = ({label, value}) => {
 type PropertyCardProps = {
   baths: string;
   bedrooms: string;
+  onAvailabilityPress: () => void;
   title: string;
 };
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
   baths,
   bedrooms,
+  onAvailabilityPress,
   title,
 }) => {
   return (
@@ -455,9 +475,12 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
           City view | 3rd floor | Elevator | Parking
         </Text>
 
-        <View style={styles.availabilityChip}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onAvailabilityPress}
+          style={styles.availabilityChip}>
           <Text style={styles.availabilityText}>Available 28 Nov 2021</Text>
-        </View>
+        </Pressable>
 
         <Text style={styles.propertyPrice}>
           from <Text style={styles.propertyPriceStrong}>LKR13490</Text> /month
@@ -836,6 +859,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderRadius: radii.pill,
     borderWidth: 1,
     borderColor: colors.error,
