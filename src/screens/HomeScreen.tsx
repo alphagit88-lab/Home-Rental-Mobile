@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
@@ -18,12 +19,18 @@ import HeroBackground from '../assets/images/Untitled design (3) 1.svg';
 import RectangleBg from '../assets/images/Rectangle 7.svg';
 import JogjaImage from '../assets/images/jogja2 1.svg';
 import LombokImage from '../assets/images/lombok2 1.svg';
-import DashboardIcon from '../assets/images/1 235.svg';
-import PropertiesIcon from '../assets/images/1 236.svg';
-import BookingsIcon from '../assets/images/1 237.svg';
-import AccountIcon from '../assets/images/1 239.svg';
 
-export const HomeScreen: React.FC = () => {
+type HomeScreenProps = {
+  activeTab: AppTab;
+  onSearchPress?: () => void;
+  onTabPress: (tab: AppTab) => void;
+};
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({
+  activeTab,
+  onSearchPress,
+  onTabPress,
+}) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
@@ -99,7 +106,7 @@ export const HomeScreen: React.FC = () => {
 
               <Pressable
                 accessibilityRole="button"
-                onPress={home.onSearchPress}
+                onPress={onSearchPress}
                 style={styles.searchButton}>
                 <Text style={styles.searchButtonText}>Search Properties</Text>
               </Pressable>
@@ -161,63 +168,9 @@ export const HomeScreen: React.FC = () => {
           </View>
         </ScrollView>
 
-        <View style={styles.bottomNav}>
-          <BottomNavItem
-            active={home.activeTab === 'dashboard'}
-            icon={<DashboardIcon height={22} width={22} />}
-            label="Dashboard"
-            onPress={() => home.onTabPress('dashboard')}
-          />
-          <BottomNavItem
-            active={home.activeTab === 'properties'}
-            icon={<PropertiesIcon height={22} width={22} />}
-            label="Properties"
-            onPress={() => home.onTabPress('properties')}
-          />
-          <BottomNavItem
-            active={home.activeTab === 'bookings'}
-            icon={<BookingsIcon height={22} width={22} />}
-            label="Bookings"
-            onPress={() => home.onTabPress('bookings')}
-          />
-          <BottomNavItem
-            active={home.activeTab === 'account'}
-            icon={<AccountIcon height={22} width={22} />}
-            label="Account"
-            onPress={() => home.onTabPress('account')}
-          />
-        </View>
+        <AppBottomNav activeTab={activeTab} onTabPress={onTabPress} />
       </View>
     </SafeAreaView>
-  );
-};
-
-type BottomNavItemProps = {
-  active: boolean;
-  icon: React.ReactNode;
-  label: string;
-  onPress: () => void;
-};
-
-const BottomNavItem: React.FC<BottomNavItemProps> = ({
-  active,
-  icon,
-  label,
-  onPress,
-}) => {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[styles.navItem, active ? styles.navItemActive : null]}>
-      <View
-        style={[styles.navIconCircle, active ? styles.navIconActive : null]}>
-        {icon}
-      </View>
-      <Text style={[styles.navLabel, active ? styles.navLabelActive : null]}>
-        {label}
-      </Text>
-    </Pressable>
   );
 };
 
@@ -412,55 +365,5 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontFamily: fonts.bold,
     fontSize: 15,
-  },
-  bottomNav: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: spacing.sm,
-    paddingTop: spacing.md,
-    paddingBottom: 0,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-  },
-  navItemActive: {
-    backgroundColor: colors.white,
-    paddingBottom: spacing.md + 2,
-  },
-  navIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  navIconActive: {
-    borderColor: colors.primary,
-  },
-  navLabel: {
-    color: colors.white,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-  },
-  navLabelActive: {
-    color: colors.primary,
   },
 });
