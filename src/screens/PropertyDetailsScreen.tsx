@@ -20,12 +20,14 @@ import {colors, fonts, radii, spacing} from '../theme';
 type PropertyDetailsScreenProps = {
   activeTab: AppTab;
   onBack: () => void;
+  onBookNow: () => void;
   onTabPress: (tab: AppTab) => void;
 };
 
 export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
   activeTab,
   onBack,
+  onBookNow,
   onTabPress,
 }) => {
   const responsive = useResponsive();
@@ -98,7 +100,10 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                 <StatColumn label="DURATION" suffix="hours" value="24" />
               </View>
 
-              <Pressable accessibilityRole="button" style={styles.bookButton}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={onBookNow}
+                style={styles.bookButton}>
                 <Text style={styles.bookButtonText}>BOOK NOW</Text>
               </Pressable>
             </View>

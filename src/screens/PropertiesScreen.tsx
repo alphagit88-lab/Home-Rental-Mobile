@@ -24,6 +24,7 @@ import WifiIcon from '../assets/images/eva_wifi-fill.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {PropertyBookingScreen} from './PropertyBookingScreen';
 import {PropertyDetailsScreen} from './PropertyDetailsScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
@@ -91,6 +92,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
   const [detailVisible, setDetailVisible] = useState(false);
+  const [bookingVisible, setBookingVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
   const [selectedSortBy, setSelectedSortBy] = useState('Nearest');
   const [selectedPropertyTypes, setSelectedPropertyTypes] =
@@ -124,11 +126,26 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     setBudgetRange(defaultBudgetRange);
   };
 
+  if (bookingVisible) {
+    return (
+      <PropertyBookingScreen
+        activeTab={activeTab}
+        onBack={() => setBookingVisible(false)}
+        onTabPress={tab => {
+          setBookingVisible(false);
+          setDetailVisible(false);
+          onTabPress(tab);
+        }}
+      />
+    );
+  }
+
   if (detailVisible) {
     return (
       <PropertyDetailsScreen
         activeTab={activeTab}
         onBack={() => setDetailVisible(false)}
+        onBookNow={() => setBookingVisible(true)}
         onTabPress={tab => {
           setDetailVisible(false);
           onTabPress(tab);
