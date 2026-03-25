@@ -8,6 +8,7 @@ import {LoginScreen} from './src/screens/LoginScreen';
 import {OwnerAddPropertyScreen} from './src/screens/OwnerAddPropertyScreen';
 import {OwnerBookingsScreen} from './src/screens/OwnerBookingsScreen';
 import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
+import {OwnerPropertyDetailsScreen} from './src/screens/OwnerPropertyDetailsScreen';
 import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
 import {SignUpScreen} from './src/screens/SignUpScreen';
@@ -18,9 +19,11 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [dashboardVariant, setDashboardVariant] =
     useState<DashboardVariant>('standard');
-  const [ownerPropertiesView, setOwnerPropertiesView] = useState<'list' | 'create'>(
-    'list',
-  );
+  const [ownerPropertiesView, setOwnerPropertiesView] = useState<
+    'list' | 'create' | 'detail' | 'edit'
+  >('list');
+  const [selectedOwnerPropertyTitle, setSelectedOwnerPropertyTitle] =
+    useState('Colombo Lux House');
 
   const handleTabPress = (tab: AppTab) => {
     if (tab !== 'properties') {
@@ -38,7 +41,33 @@ const App: React.FC = () => {
             <OwnerAddPropertyScreen
               activeTab={activeTab}
               onBackPress={() => setOwnerPropertiesView('list')}
+              onSubmitPress={() => setOwnerPropertiesView('list')}
               onTabPress={handleTabPress}
+            />
+          );
+        }
+
+        if (ownerPropertiesView === 'edit') {
+          return (
+            <OwnerAddPropertyScreen
+              activeTab={activeTab}
+              headerTitle="Edit Property"
+              onBackPress={() => setOwnerPropertiesView('detail')}
+              onSubmitPress={() => setOwnerPropertiesView('detail')}
+              onTabPress={handleTabPress}
+              submitLabel="SAVE PROPERTY"
+            />
+          );
+        }
+
+        if (ownerPropertiesView === 'detail') {
+          return (
+            <OwnerPropertyDetailsScreen
+              activeTab={activeTab}
+              onBackPress={() => setOwnerPropertiesView('list')}
+              onEditPropertyPress={() => setOwnerPropertiesView('edit')}
+              onTabPress={handleTabPress}
+              propertyTitle={selectedOwnerPropertyTitle}
             />
           );
         }
@@ -47,6 +76,10 @@ const App: React.FC = () => {
           <OwnerPropertiesScreen
             activeTab={activeTab}
             onAddNewPropertyPress={() => setOwnerPropertiesView('create')}
+            onViewPropertyPress={title => {
+              setSelectedOwnerPropertyTitle(title);
+              setOwnerPropertiesView('detail');
+            }}
             onTabPress={handleTabPress}
           />
         );

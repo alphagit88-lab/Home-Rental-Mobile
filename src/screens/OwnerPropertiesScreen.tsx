@@ -24,6 +24,7 @@ import MinusButton from '../assets/images/Button_ minus.svg';
 type OwnerPropertiesScreenProps = {
   activeTab: AppTab;
   onAddNewPropertyPress: () => void;
+  onViewPropertyPress: (title: string) => void;
   onTabPress: (tab: AppTab) => void;
 };
 
@@ -57,6 +58,7 @@ const mapMarkers: MapMarker[] = [
 export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
   activeTab,
   onAddNewPropertyPress,
+  onViewPropertyPress,
   onTabPress,
 }) => {
   const responsive = useResponsive();
@@ -150,7 +152,7 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
                   <OwnerPropertyCard
                     key={property.id}
                     code={property.code}
-                    onPress={() => onTabPress('properties')}
+                    onPress={() => onViewPropertyPress(property.title)}
                     title={property.title}
                   />
                 ))}

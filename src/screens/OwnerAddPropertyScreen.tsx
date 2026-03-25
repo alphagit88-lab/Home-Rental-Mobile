@@ -19,8 +19,11 @@ import DropdownIcon from '../assets/images/Vector 13.svg';
 
 type OwnerAddPropertyScreenProps = {
   activeTab: AppTab;
+  headerTitle?: string;
   onBackPress: () => void;
+  onSubmitPress?: () => void;
   onTabPress: (tab: AppTab) => void;
+  submitLabel?: string;
 };
 
 type SelectFieldProps = {
@@ -46,8 +49,11 @@ type LargeFieldProps = {
 
 export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   activeTab,
+  headerTitle = 'Add new Property',
   onBackPress,
+  onSubmitPress,
   onTabPress,
+  submitLabel = 'ADD NEW PROPERTY',
 }) => {
   const responsive = useResponsive();
   const [propertyName, setPropertyName] = useState('');
@@ -78,7 +84,7 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 <BackIcon height={18} width={18} />
               </Pressable>
 
-              <Text style={styles.headerTitle}>Add new Property</Text>
+              <Text style={styles.headerTitle}>{headerTitle}</Text>
 
               <View style={styles.headerSpacer} />
             </View>
@@ -152,9 +158,9 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
 
               <Pressable
                 accessibilityRole="button"
-                onPress={onBackPress}
+                onPress={onSubmitPress ?? onBackPress}
                 style={styles.submitButton}>
-                <Text style={styles.submitButtonText}>ADD NEW PROPERTY</Text>
+                <Text style={styles.submitButtonText}>{submitLabel}</Text>
               </Pressable>
             </View>
           </ScrollView>
