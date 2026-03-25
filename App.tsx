@@ -5,15 +5,29 @@ import {AccountScreen} from './src/screens/AccountScreen';
 import {BookingsScreen} from './src/screens/BookingsScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
+import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
+import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
 import {SignUpScreen} from './src/screens/SignUpScreen';
+import {DashboardVariant} from './src/types/appFlow';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'login' | 'signup' | 'home'>('login');
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [dashboardVariant, setDashboardVariant] =
+    useState<DashboardVariant>('standard');
 
   if (screen === 'home') {
     if (activeTab === 'properties') {
+      if (dashboardVariant === 'owner') {
+        return (
+          <OwnerPropertiesScreen
+            activeTab={activeTab}
+            onTabPress={setActiveTab}
+          />
+        );
+      }
+
       return (
         <PropertiesScreen activeTab={activeTab} onTabPress={setActiveTab} />
       );
@@ -34,10 +48,21 @@ const App: React.FC = () => {
         <AccountScreen
           activeTab={activeTab}
           onLogout={() => {
+            setDashboardVariant('standard');
             setActiveTab('dashboard');
             setScreen('login');
           }}
           onTabPress={setActiveTab}
+        />
+      );
+    }
+
+    if (dashboardVariant === 'owner') {
+      return (
+        <OwnerHomeScreen
+          activeTab={activeTab}
+          onTabPress={setActiveTab}
+          onViewBookingsPress={() => setActiveTab('bookings')}
         />
       );
     }
@@ -54,7 +79,8 @@ const App: React.FC = () => {
   if (screen === 'signup') {
     return (
       <SignUpScreen
-        onNavigateToHome={() => {
+        onNavigateToHome={variant => {
+          setDashboardVariant(variant);
           setActiveTab('dashboard');
           setScreen('home');
         }}
@@ -63,7 +89,16 @@ const App: React.FC = () => {
     );
   }
 
-  return <LoginScreen onNavigateToSignUp={() => setScreen('signup')} />;
+  return (
+    <LoginScreen
+      onNavigateToHome={variant => {
+        setDashboardVariant(variant);
+        setActiveTab('dashboard');
+        setScreen('home');
+      }}
+      onNavigateToSignUp={() => setScreen('signup')}
+    />
+  );
 };
 
 export default App;

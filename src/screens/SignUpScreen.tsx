@@ -18,6 +18,7 @@ import { SelectField } from '../components/SelectField';
 import { useResponsive } from '../hooks/useResponsive';
 import { useSignUpScreen } from '../hooks/useSignUpScreen';
 import { colors, fonts, spacing } from '../theme';
+import { DashboardVariant } from '../types/appFlow';
 import ProfileIcon from '../assets/images/Profile.svg';
 import RoleArrowIcon from '../assets/images/20 1.svg';
 import MessageIcon from '../assets/images/Message.svg';
@@ -28,7 +29,7 @@ import SignUpHeroImage from '../assets/images/Untitled design (3) 1.svg';
 
 type SignUpScreenProps = {
   onNavigateToSignIn?: () => void;
-  onNavigateToHome?: () => void;
+  onNavigateToHome?: (variant: DashboardVariant) => void;
 };
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({

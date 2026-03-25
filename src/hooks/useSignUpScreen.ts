@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { HeroState, InlineMessage, SubmitState, WelcomeContent } from './useLoginScreen';
+import { DashboardVariant } from '../types/appFlow';
 
 const defaultHeroContent: WelcomeContent = {
   greeting: 'Hello, Guest',
@@ -7,7 +8,7 @@ const defaultHeroContent: WelcomeContent = {
   tagline: 'Smart Home Rent Management.',
 };
 
-const signupRoles = ['Owner', 'Tenant', 'Guest'];
+const signupRoles = ['Property Owner', 'Tenant', 'Guest'];
 
 export const useSignUpScreen = () => {
   const [heroState, setHeroState] = useState<HeroState>({
@@ -22,6 +23,10 @@ export const useSignUpScreen = () => {
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
   const signUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dashboardVariant: DashboardVariant =
+    signupRoleIndex !== null && signupRoles[signupRoleIndex] === 'Property Owner'
+      ? 'owner'
+      : 'standard';
 
   useEffect(() => {
     return () => {
@@ -49,17 +54,20 @@ export const useSignUpScreen = () => {
     });
   };
 
-  const onSignUpPress = (onSuccess?: () => void) => {
+  const onSignUpPress = (
+    onSuccess?: (variant: DashboardVariant) => void,
+  ) => {
     setSubmitState('loading');
     setInlineMessage(null);
 
     signUpTimerRef.current = setTimeout(() => {
       setSubmitState('idle');
-      onSuccess?.();
+      onSuccess?.(dashboardVariant);
     }, 550);
   };
 
   return {
+    dashboardVariant,
     heroState,
     signUpAs: signupRoleIndex === null ? '' : signupRoles[signupRoleIndex],
     fullName,

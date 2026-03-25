@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { DashboardVariant } from '../types/appFlow';
 
 export type WelcomeContent = {
   greeting: string;
@@ -31,6 +32,8 @@ export const useLoginScreen = () => {
     status: 'content',
     content: defaultHeroContent,
   });
+  const [dashboardVariant, setDashboardVariant] =
+    useState<DashboardVariant>('standard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -72,7 +75,9 @@ export const useLoginScreen = () => {
     setInlineMessage(null);
   };
 
-  const onSignInPress = () => {
+  const onSignInPress = (
+    onSuccess?: (variant: DashboardVariant) => void,
+  ) => {
     if (!email.trim() || !password.trim()) {
       setSubmitState('error');
       setInlineMessage({
@@ -82,21 +87,18 @@ export const useLoginScreen = () => {
       return;
     }
 
-    // TODO: Replace with real sign-in request and backend validation.
     setSubmitState('loading');
     setInlineMessage(null);
 
     signInTimerRef.current = setTimeout(() => {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'TODO: Connect the sign-in API.',
-        tone: 'neutral',
-      });
-    }, 1100);
+      setSubmitState('idle');
+      onSuccess?.(dashboardVariant);
+    }, 550);
   };
 
   return {
     heroState,
+    dashboardVariant,
     email,
     password,
     rememberMe,
@@ -106,6 +108,7 @@ export const useLoginScreen = () => {
     setEmail,
     setPassword,
     setRememberMe,
+    setDashboardVariant,
     setPasswordVisible,
     onForgotPasswordPress,
     onSignUpPress,

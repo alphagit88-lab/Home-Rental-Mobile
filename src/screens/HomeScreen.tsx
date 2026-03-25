@@ -65,8 +65,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 accessibilityRole="button"
                 onPress={home.onProfilePress}
                 style={styles.profileButton}>
-                <Text
-                  style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
+                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
                 <View style={styles.profileImageWrap}>
                   <ProfilePic height="100%" width="100%" />
                 </View>
