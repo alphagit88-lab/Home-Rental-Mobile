@@ -48,10 +48,7 @@ export const useSignUpScreen = () => {
     setSignupRoleIndex((current) =>
       current === null ? 0 : (current + 1) % signupRoles.length,
     );
-    setInlineMessage({
-      text: 'TODO: Replace role picker with your real selection flow.',
-      tone: 'neutral',
-    });
+    setInlineMessage(null);
   };
 
   const onSignUpPress = (

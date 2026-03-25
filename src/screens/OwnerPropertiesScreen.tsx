@@ -23,6 +23,7 @@ import MinusButton from '../assets/images/Button_ minus.svg';
 
 type OwnerPropertiesScreenProps = {
   activeTab: AppTab;
+  onAddNewPropertyPress: () => void;
   onTabPress: (tab: AppTab) => void;
 };
 
@@ -55,6 +56,7 @@ const mapMarkers: MapMarker[] = [
 
 export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
   activeTab,
+  onAddNewPropertyPress,
   onTabPress,
 }) => {
   const responsive = useResponsive();
@@ -98,7 +100,10 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
               </Pressable>
             </View>
 
-            <Pressable accessibilityRole="button" style={styles.addButton}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onAddNewPropertyPress}
+              style={styles.addButton}>
               <Text style={styles.addButtonText}>ADD NEW PROPERTY</Text>
             </Pressable>
 

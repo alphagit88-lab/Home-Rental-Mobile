@@ -5,6 +5,8 @@ import {AccountScreen} from './src/screens/AccountScreen';
 import {BookingsScreen} from './src/screens/BookingsScreen';
 import {HomeScreen} from './src/screens/HomeScreen';
 import {LoginScreen} from './src/screens/LoginScreen';
+import {OwnerAddPropertyScreen} from './src/screens/OwnerAddPropertyScreen';
+import {OwnerBookingsScreen} from './src/screens/OwnerBookingsScreen';
 import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
 import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
@@ -16,29 +18,60 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [dashboardVariant, setDashboardVariant] =
     useState<DashboardVariant>('standard');
+  const [ownerPropertiesView, setOwnerPropertiesView] = useState<'list' | 'create'>(
+    'list',
+  );
+
+  const handleTabPress = (tab: AppTab) => {
+    if (tab !== 'properties') {
+      setOwnerPropertiesView('list');
+    }
+
+    setActiveTab(tab);
+  };
 
   if (screen === 'home') {
     if (activeTab === 'properties') {
       if (dashboardVariant === 'owner') {
+        if (ownerPropertiesView === 'create') {
+          return (
+            <OwnerAddPropertyScreen
+              activeTab={activeTab}
+              onBackPress={() => setOwnerPropertiesView('list')}
+              onTabPress={handleTabPress}
+            />
+          );
+        }
+
         return (
           <OwnerPropertiesScreen
             activeTab={activeTab}
-            onTabPress={setActiveTab}
+            onAddNewPropertyPress={() => setOwnerPropertiesView('create')}
+            onTabPress={handleTabPress}
           />
         );
       }
 
       return (
-        <PropertiesScreen activeTab={activeTab} onTabPress={setActiveTab} />
+        <PropertiesScreen activeTab={activeTab} onTabPress={handleTabPress} />
       );
     }
 
     if (activeTab === 'bookings') {
+      if (dashboardVariant === 'owner') {
+        return (
+          <OwnerBookingsScreen
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        );
+      }
+
       return (
         <BookingsScreen
           activeTab={activeTab}
           onSearchPress={() => setActiveTab('properties')}
-          onTabPress={setActiveTab}
+          onTabPress={handleTabPress}
         />
       );
     }
@@ -49,10 +82,11 @@ const App: React.FC = () => {
           activeTab={activeTab}
           onLogout={() => {
             setDashboardVariant('standard');
+            setOwnerPropertiesView('list');
             setActiveTab('dashboard');
             setScreen('login');
           }}
-          onTabPress={setActiveTab}
+          onTabPress={handleTabPress}
         />
       );
     }
@@ -61,7 +95,7 @@ const App: React.FC = () => {
       return (
         <OwnerHomeScreen
           activeTab={activeTab}
-          onTabPress={setActiveTab}
+          onTabPress={handleTabPress}
           onViewBookingsPress={() => setActiveTab('bookings')}
         />
       );
@@ -71,7 +105,7 @@ const App: React.FC = () => {
       <HomeScreen
         activeTab={activeTab}
         onSearchPress={() => setActiveTab('properties')}
-        onTabPress={setActiveTab}
+        onTabPress={handleTabPress}
       />
     );
   }
@@ -81,6 +115,7 @@ const App: React.FC = () => {
       <SignUpScreen
         onNavigateToHome={variant => {
           setDashboardVariant(variant);
+          setOwnerPropertiesView('list');
           setActiveTab('dashboard');
           setScreen('home');
         }}
@@ -93,6 +128,7 @@ const App: React.FC = () => {
     <LoginScreen
       onNavigateToHome={variant => {
         setDashboardVariant(variant);
+        setOwnerPropertiesView('list');
         setActiveTab('dashboard');
         setScreen('home');
       }}
