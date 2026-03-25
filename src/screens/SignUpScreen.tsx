@@ -150,7 +150,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                   <PrimaryActionButton
                     title="Sign Up"
                     loading={signUp.submitState === 'loading'}
-                    onPress={() => signUp.onSignUpPress(onNavigateToHome)}
+                    onPress={() => {
+                      void signUp.onSignUpPress(onNavigateToHome);
+                    }}
                     trailingIcon={<ShapeIcon height={12} width={12} />}
                   />
                 </View>

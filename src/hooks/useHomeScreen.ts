@@ -1,4 +1,8 @@
+import { getAuthSession } from '../services/authSession';
+
 export const useHomeScreen = () => {
+  const session = getAuthSession();
+
   const onMenuPress = () => {
     // TODO: Connect menu drawer.
   };
@@ -12,7 +16,7 @@ export const useHomeScreen = () => {
   };
 
   return {
-    userName: 'Mirah',
+    userName: session?.user.name.split(' ')[0] ?? 'Guest',
     featuredProperty: {
       title: 'Colombo House',
       description:

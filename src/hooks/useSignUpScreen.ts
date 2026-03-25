@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { HeroState, InlineMessage, SubmitState, WelcomeContent } from './useLoginScreen';
 import { DashboardVariant } from '../types/appFlow';
+import { setAuthSession } from '../services/authSession';
+import { RentalRole, signUp } from '../services/rentalAuth';
 
 const defaultHeroContent: WelcomeContent = {
   greeting: 'Hello, Guest',
@@ -8,7 +10,7 @@ const defaultHeroContent: WelcomeContent = {
   tagline: 'Smart Home Rent Management.',
 };
 
-const signupRoles = ['Property Owner', 'Tenant', 'Guest'];
+const signupRoles = ['Tenant', 'Property Owner'];
 
 export const useSignUpScreen = () => {
   const [heroState, setHeroState] = useState<HeroState>({
@@ -22,19 +24,10 @@ export const useSignUpScreen = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
-  const signUpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dashboardVariant: DashboardVariant =
     signupRoleIndex !== null && signupRoles[signupRoleIndex] === 'Property Owner'
       ? 'owner'
       : 'standard';
-
-  useEffect(() => {
-    return () => {
-      if (signUpTimerRef.current) {
-        clearTimeout(signUpTimerRef.current);
-      }
-    };
-  }, []);
 
   const onRetryHeroPress = () => {
     setHeroState({
@@ -51,16 +44,76 @@ export const useSignUpScreen = () => {
     setInlineMessage(null);
   };
 
-  const onSignUpPress = (
+  const onSignUpPress = async (
     onSuccess?: (variant: DashboardVariant) => void,
   ) => {
+    if (signupRoleIndex === null) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please choose whether you are a tenant or property owner.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (!fullName.trim() || !email.trim() || !password.trim()) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please complete name, email, and password.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter a valid email address.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (password.trim().length < 6) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Password must be at least 6 characters long.',
+        tone: 'error',
+      });
+      return;
+    }
+
     setSubmitState('loading');
     setInlineMessage(null);
 
-    signUpTimerRef.current = setTimeout(() => {
+    const role: RentalRole =
+      signupRoles[signupRoleIndex] === 'Property Owner' ? 'owner' : 'tenant';
+
+    try {
+      const session = await signUp({
+        name: fullName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        role,
+      });
+
+      setAuthSession(session);
       setSubmitState('idle');
-      onSuccess?.(dashboardVariant);
-    }, 550);
+      setInlineMessage({
+        text: 'Account created successfully.',
+        tone: 'success',
+      });
+      onSuccess?.(session.user.role === 'owner' ? 'owner' : 'standard');
+    } catch (error) {
+      setSubmitState('error');
+      setInlineMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Unable to create your account right now.',
+        tone: 'error',
+      });
+    }
   };
 
   return {

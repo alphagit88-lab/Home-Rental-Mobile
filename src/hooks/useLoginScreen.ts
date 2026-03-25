@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { DashboardVariant } from '../types/appFlow';
+import { setAuthSession } from '../services/authSession';
+import { signIn } from '../services/rentalAuth';
 
 export type WelcomeContent = {
   greeting: string;
@@ -40,20 +42,11 @@ export const useLoginScreen = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
-  const signInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (signInTimerRef.current) {
-        clearTimeout(signInTimerRef.current);
-      }
-    };
-  }, []);
 
   const onForgotPasswordPress = () => {
     // TODO: Connect forgot password flow or navigation.
     setInlineMessage({
-      text: 'TODO: Connect forgot password flow.',
+      text: 'Forgot password is not connected yet.',
       tone: 'neutral',
     });
   };
@@ -75,7 +68,7 @@ export const useLoginScreen = () => {
     setInlineMessage(null);
   };
 
-  const onSignInPress = (
+  const onSignInPress = async (
     onSuccess?: (variant: DashboardVariant) => void,
   ) => {
     if (!email.trim() || !password.trim()) {
@@ -87,13 +80,52 @@ export const useLoginScreen = () => {
       return;
     }
 
+    if (!email.includes('@')) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter a valid email address.',
+        tone: 'error',
+      });
+      return;
+    }
+
     setSubmitState('loading');
     setInlineMessage(null);
 
-    signInTimerRef.current = setTimeout(() => {
+    try {
+      const expectedRole = dashboardVariant === 'owner' ? 'owner' : 'tenant';
+      const session = await signIn({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      if (session.user.role !== expectedRole) {
+        setSubmitState('error');
+        setInlineMessage({
+          text:
+            expectedRole === 'owner'
+              ? 'This account is not a Property Owner account. Select Tenant to continue.'
+              : 'This account is not a Tenant account. Select Property Owner to continue.',
+          tone: 'error',
+        });
+        return;
+      }
+
+      setAuthSession(session);
       setSubmitState('idle');
-      onSuccess?.(dashboardVariant);
-    }, 550);
+      setInlineMessage({
+        text: `Welcome back, ${session.user.name}.`,
+        tone: 'success',
+      });
+      onSuccess?.(session.user.role === 'owner' ? 'owner' : 'standard');
+    } catch (error) {
+      setSubmitState('error');
+      setInlineMessage({
+        text:
+          error instanceof Error ? error.message : 'Unable to sign in right now.',
+        tone: 'error',
+      });
+    }
   };
 
   return {

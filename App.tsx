@@ -13,6 +13,7 @@ import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
 import {SignUpScreen} from './src/screens/SignUpScreen';
 import {DashboardVariant} from './src/types/appFlow';
+import {clearAuthSession} from './src/services/authSession';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'login' | 'signup' | 'home'>('login');
@@ -114,6 +115,7 @@ const App: React.FC = () => {
         <AccountScreen
           activeTab={activeTab}
           onLogout={() => {
+            clearAuthSession();
             setDashboardVariant('standard');
             setOwnerPropertiesView('list');
             setActiveTab('dashboard');

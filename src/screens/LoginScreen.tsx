@@ -186,7 +186,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 <PrimaryActionButton
                   title="Sign In"
                   loading={login.submitState === 'loading'}
-                  onPress={() => login.onSignInPress(onNavigateToHome)}
+                  onPress={() => {
+                    void login.onSignInPress(onNavigateToHome);
+                  }}
                   trailingIcon={<ShapeIcon height={12} width={12} />}
                 />
 
