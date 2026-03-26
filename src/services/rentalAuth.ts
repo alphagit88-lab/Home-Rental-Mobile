@@ -34,6 +34,13 @@ type SignUpParams = {
   role: RentalRole;
 };
 
+type UpdateProfileParams = {
+  currentPassword?: string;
+  email: string;
+  name: string;
+  newPassword?: string;
+};
+
 const MANUAL_API_BASE_URL = '';
 const ANDROID_EMULATOR_API_BASE_URL = 'http://10.0.2.2:5000';
 const IOS_SIMULATOR_API_BASE_URL = 'http://127.0.0.1:5000';
@@ -123,6 +130,22 @@ export const getCurrentUser = async (token: string) =>
       },
     },
     'Unable to fetch your account.',
+  );
+
+export const updateProfile = async (
+  token: string,
+  params: UpdateProfileParams,
+) =>
+  request<{ user: AuthUser }>(
+    '/api/rental-auth/profile',
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    },
+    'Unable to update your profile.',
   );
 
 export { API_BASE_URL };

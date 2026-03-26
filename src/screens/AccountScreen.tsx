@@ -30,6 +30,7 @@ import {colors, fonts, radii, spacing} from '../theme';
 
 type AccountScreenProps = {
   activeTab: AppTab;
+  onEditProfile: () => void;
   onLogout: () => void;
   onTabPress: (tab: AppTab) => void;
 };
@@ -47,6 +48,7 @@ type SettingsSection = {
 
 export const AccountScreen: React.FC<AccountScreenProps> = ({
   activeTab,
+  onEditProfile,
   onLogout,
   onTabPress,
 }) => {
@@ -58,7 +60,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
     {
       title: 'Account',
       items: [
-        {label: 'Edit profile', Icon: EditProfileIcon},
+        {label: 'Edit profile', Icon: EditProfileIcon, onPress: onEditProfile},
         {label: 'Security', Icon: SecurityIcon},
         {label: 'Notifications', Icon: NotificationsIcon},
         {label: 'Privacy', Icon: PrivacyIcon},
