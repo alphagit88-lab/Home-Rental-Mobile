@@ -23,6 +23,7 @@ import {
   updateProperty,
 } from '../services/properties';
 import {colors, fonts, spacing} from '../theme';
+import {formatIsoDateInput, normalizeDateString} from '../utils/dateInput';
 
 type OwnerAddPropertyScreenProps = {
   activeTab: AppTab;
@@ -44,6 +45,7 @@ type SelectFieldProps = {
 type TextFieldProps = {
   keyboardType?: 'default' | 'decimal-pad' | 'number-pad';
   label: string;
+  maxLength?: number;
   onChangeText: (value: string) => void;
   placeholder: string;
   value: string;
@@ -72,8 +74,7 @@ const formatCoordinateValue = (value?: number) =>
 const formatMoneyValue = (value?: number | null) =>
   typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
 
-const formatDateValue = (value?: string | null) =>
-  value ? String(value).slice(0, 10) : '';
+const formatDateValue = (value?: string | null) => formatIsoDateInput(value);
 
 const parseCoordinateValue = (value: string) => {
   const normalizedValue = value.trim();
@@ -98,19 +99,7 @@ const parseMoneyValue = (value: string) => {
 };
 
 const isValidDateValue = (value: string) => {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split('-').map(Number);
-  const parsed = new Date(`${value}T00:00:00Z`);
-
-  return (
-    !Number.isNaN(parsed.getTime()) &&
-    parsed.getUTCFullYear() === year &&
-    parsed.getUTCMonth() + 1 === month &&
-    parsed.getUTCDate() === day
-  );
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && normalizeDateString(value) === value;
 };
 
 const normalizeDateValue = (value: string) => {
@@ -401,15 +390,19 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
               />
 
               <TextField
+                keyboardType="number-pad"
                 label="Available From"
-                onChangeText={setAvailableFrom}
+                maxLength={10}
+                onChangeText={value => setAvailableFrom(formatIsoDateInput(value))}
                 placeholder="YYYY-MM-DD"
                 value={availableFrom}
               />
 
               <TextField
+                keyboardType="number-pad"
                 label="Available To"
-                onChangeText={setAvailableTo}
+                maxLength={10}
+                onChangeText={value => setAvailableTo(formatIsoDateInput(value))}
                 placeholder="YYYY-MM-DD"
                 value={availableTo}
               />
@@ -507,6 +500,7 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
 const TextField: React.FC<TextFieldProps> = ({
   keyboardType = 'default',
   label,
+  maxLength,
   onChangeText,
   placeholder,
   value,
@@ -516,6 +510,7 @@ const TextField: React.FC<TextFieldProps> = ({
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
         keyboardType={keyboardType}
+        maxLength={maxLength}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor="#B6B1AB"

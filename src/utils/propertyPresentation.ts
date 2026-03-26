@@ -1,5 +1,13 @@
+import {normalizeDateString} from './dateInput';
+
 const formatDateLabel = (value: string) => {
-  const parsed = new Date(`${value}T00:00:00Z`);
+  const normalizedValue = normalizeDateString(value);
+
+  if (!normalizedValue) {
+    return value;
+  }
+
+  const parsed = new Date(`${normalizedValue}T00:00:00Z`);
 
   if (Number.isNaN(parsed.getTime())) {
     return value;

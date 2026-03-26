@@ -1,3 +1,4 @@
+import {normalizeDateString} from '../utils/dateInput';
 import {API_BASE_URL} from './rentalAuth';
 
 type ApiEnvelope<T> = {
@@ -133,7 +134,12 @@ const normalizeOptionalDate = (value: unknown) => {
   }
 
   const normalizedValue = String(value).trim();
-  return normalizedValue.length > 0 ? normalizedValue.slice(0, 10) : null;
+
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  return normalizeDateString(normalizedValue) ?? normalizedValue.slice(0, 10);
 };
 
 const getCoordinatePreset = (locationText: string) => {

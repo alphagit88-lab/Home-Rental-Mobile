@@ -19,6 +19,7 @@ import {useResponsive} from '../hooks/useResponsive';
 import {PropertyRecord} from '../services/properties';
 import {PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, spacing} from '../theme';
+import {formatShortDateInput} from '../utils/dateInput';
 import {
   formatPropertyAvailability,
   formatPropertyRent,
@@ -111,13 +112,17 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
             <View style={styles.dateRow}>
               <DateInput
                 label="Check-in"
-                onChangeText={value => onUpdateBookingDraft({checkIn: value})}
+                onChangeText={value =>
+                  onUpdateBookingDraft({checkIn: formatShortDateInput(value)})
+                }
                 placeholder="DD/MM/YY"
                 value={bookingDraft.checkIn}
               />
               <DateInput
                 label="Check-out"
-                onChangeText={value => onUpdateBookingDraft({checkOut: value})}
+                onChangeText={value =>
+                  onUpdateBookingDraft({checkOut: formatShortDateInput(value)})
+                }
                 placeholder="DD/MM/YY"
                 value={bookingDraft.checkOut}
               />
@@ -213,6 +218,8 @@ const DateInput: React.FC<DateInputProps> = ({
       <Text style={styles.dateInputLabel}>{label}</Text>
       <View style={styles.dateInput}>
         <TextInput
+          keyboardType="number-pad"
+          maxLength={8}
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor="#B2B2B2"
