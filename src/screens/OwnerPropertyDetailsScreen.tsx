@@ -15,36 +15,37 @@ import HeroImage from '../assets/images/image.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {PropertyMapCard} from '../components/PropertyMapCard';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
+import {PropertyRecord} from '../services/properties';
 import {colors, fonts, spacing} from '../theme';
+import {
+  formatPropertyAvailability,
+  formatPropertyRent,
+} from '../utils/propertyPresentation';
 
 type OwnerPropertyDetailsScreenProps = {
   activeTab: AppTab;
   onBackPress: () => void;
   onEditPropertyPress: () => void;
   onTabPress: (tab: AppTab) => void;
-  propertyTitle: string;
+  property: PropertyRecord;
 };
 
 type StatColumnProps = {
   label: string;
-  suffix: string;
+  suffix?: string;
   value: string;
 };
 
 export const OwnerPropertyDetailsScreen: React.FC<
   OwnerPropertyDetailsScreenProps
-> = ({
-  activeTab,
-  onBackPress,
-  onEditPropertyPress,
-  onTabPress,
-  propertyTitle,
-}) => {
+> = ({activeTab, onBackPress, onEditPropertyPress, onTabPress, property}) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const amenities = property.amenities;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -99,7 +100,7 @@ export const OwnerPropertyDetailsScreen: React.FC<
               </Pressable>
 
               <Text numberOfLines={1} style={styles.titleText}>
-                {propertyTitle}
+                {property.propertyCode}
               </Text>
             </View>
 
@@ -115,30 +116,54 @@ export const OwnerPropertyDetailsScreen: React.FC<
               </View>
 
               <View style={styles.heroTextWrap}>
-                <Text style={styles.heroTitle}>Luxury House</Text>
+                <Text style={styles.heroTitle}>{property.title}</Text>
                 <View style={styles.locationRow}>
                   <MapMarkerIcon height={18} width={18} />
-                  <Text style={styles.locationText}>Colombo</Text>
+                  <Text style={styles.locationText}>{property.locationText}</Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.detailsCard}>
-              <Text style={styles.propertyName}>{propertyTitle}</Text>
+              <Text style={styles.propertyName}>{property.title}</Text>
               <Text style={styles.descriptionText}>
-                Dreamland beach there are white coral rocks that surround the
-                beach, this creates a beautiful view of its own.
+                {property.description || 'No description has been added for this property yet.'}
               </Text>
 
-              <Text style={styles.includeTitle}>Include</Text>
-              <Text style={styles.includeText}>• Lorem</Text>
-              <Text style={styles.includeText}>• Lorem Ipsum Lorem</Text>
-              <Text style={styles.includeText}>• Lorem Ipsum</Text>
+              <InfoRow
+                label="Monthly Rent"
+                value={formatPropertyRent(property.monthlyRent)}
+              />
+              <InfoRow
+                label="Available"
+                value={formatPropertyAvailability(
+                  property.availableFrom,
+                  property.availableTo,
+                )}
+              />
+
+              <PropertyMapCard
+                latitude={property.latitude}
+                locationLabel={property.locationText}
+                longitude={property.longitude}
+                title={property.title}
+              />
+
+              <Text style={styles.includeTitle}>Amenities</Text>
+              {amenities.length > 0 ? (
+                amenities.map(item => (
+                  <Text key={item} style={styles.includeText}>
+                    {`- ${item}`}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.includeEmptyText}>No amenities added yet.</Text>
+              )}
 
               <View style={styles.statsRow}>
-                <StatColumn label="PRICE" suffix="" value="LKR 25K" />
-                <StatColumn label="RATING" suffix="/10" value="8.9" />
-                <StatColumn label="DURATION" suffix="hours" value="24" />
+                <StatColumn label="BEDROOMS" value={String(property.bedrooms)} />
+                <StatColumn label="BATHROOMS" value={String(property.bathrooms)} />
+                <StatColumn label="TYPE" value={property.propertyType} />
               </View>
 
               <Pressable
@@ -148,9 +173,9 @@ export const OwnerPropertyDetailsScreen: React.FC<
                 <Text style={styles.editButtonText}>EDIT PROPERTY</Text>
               </Pressable>
 
-              <Pressable accessibilityRole="button" style={styles.deleteButton}>
-                <Text style={styles.deleteButtonText}>DELETE PROPERTY</Text>
-              </Pressable>
+              <View style={styles.listingTag}>
+                <Text style={styles.listingTagText}>{property.listingType}</Text>
+              </View>
             </View>
           </View>
         </ScrollView>
@@ -165,10 +190,19 @@ const StatColumn: React.FC<StatColumnProps> = ({label, suffix, value}) => {
   return (
     <View style={styles.statColumn}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>
+      <Text numberOfLines={1} style={styles.statValue}>
         {value}
         {suffix ? <Text style={styles.statSuffix}>{suffix}</Text> : null}
       </Text>
+    </View>
+  );
+};
+
+const InfoRow: React.FC<{label: string; value: string}> = ({label, value}) => {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
 };
@@ -263,12 +297,13 @@ const styles = StyleSheet.create({
   heroTextWrap: {
     position: 'absolute',
     left: spacing.lg,
+    right: spacing.lg,
     bottom: spacing.lg,
   },
   heroTitle: {
     color: colors.white,
     fontFamily: fonts.bold,
-    fontSize: 30,
+    fontSize: 28,
     marginBottom: 4,
   },
   locationRow: {
@@ -301,7 +336,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 22,
-    marginBottom: spacing.lg + 2,
+    marginBottom: spacing.md,
+  },
+  infoRow: {
+    marginBottom: spacing.sm,
+  },
+  infoLabel: {
+    color: '#B0B0B0',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  infoValue: {
+    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
   },
   includeTitle: {
     color: '#B0B0B0',
@@ -310,7 +360,13 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   includeText: {
-    color: '#C3C3C3',
+    color: '#8B8B8B',
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  includeEmptyText: {
+    color: '#8B8B8B',
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 22,
@@ -355,14 +411,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 0.4,
   },
-  deleteButton: {
-    minHeight: 58,
+  listingTag: {
+    minHeight: 50,
     borderRadius: 10,
     backgroundColor: '#F4B533',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteButtonText: {
+  listingTagText: {
     color: colors.white,
     fontFamily: fonts.semibold,
     fontSize: 14,

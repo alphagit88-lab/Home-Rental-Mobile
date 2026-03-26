@@ -11,28 +11,38 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {AppBottomNav, AppTab} from '../components/AppBottomNav';
-import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, spacing} from '../theme';
 import BackIcon from '../assets/images/left-arrow 2.svg';
 import DropdownIcon from '../assets/images/Vector 13.svg';
+import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {useResponsive} from '../hooks/useResponsive';
+import {getAuthSession} from '../services/authSession';
+import {
+  createProperty,
+  PropertyRecord,
+  SavePropertyParams,
+  updateProperty,
+} from '../services/properties';
+import {colors, fonts, spacing} from '../theme';
 
 type OwnerAddPropertyScreenProps = {
   activeTab: AppTab;
   headerTitle?: string;
+  mode?: 'create' | 'edit';
   onBackPress: () => void;
-  onSubmitPress?: () => void;
+  onPropertySaved?: (property: PropertyRecord) => void;
   onTabPress: (tab: AppTab) => void;
+  property?: PropertyRecord | null;
   submitLabel?: string;
 };
 
 type SelectFieldProps = {
   label: string;
+  onPress?: () => void;
   value: string;
 };
 
 type TextFieldProps = {
-  keyboardType?: 'default' | 'number-pad';
+  keyboardType?: 'default' | 'decimal-pad' | 'number-pad';
   label: string;
   onChangeText: (value: string) => void;
   placeholder: string;
@@ -47,21 +57,259 @@ type LargeFieldProps = {
   value: string;
 };
 
+const propertyTypeOptions = ['Apartment', 'House', 'Room / Boarding'];
+const listingTypeOptions = ['For Rent', 'Short-term'];
+
+const parseCommaSeparatedValues = (value: string) =>
+  value
+    .split(/,|\n/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+
+const formatCoordinateValue = (value?: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(6) : '';
+
+const formatMoneyValue = (value?: number | null) =>
+  typeof value === 'number' && Number.isFinite(value) ? String(value) : '';
+
+const formatDateValue = (value?: string | null) =>
+  value ? String(value).slice(0, 10) : '';
+
+const parseCoordinateValue = (value: string) => {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const parseMoneyValue = (value: string) => {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(normalizedValue);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : NaN;
+};
+
+const isValidDateValue = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(`${value}T00:00:00Z`);
+
+  return (
+    !Number.isNaN(parsed.getTime()) &&
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() + 1 === month &&
+    parsed.getUTCDate() === day
+  );
+};
+
+const normalizeDateValue = (value: string) => {
+  const normalizedValue = value.trim();
+
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  return isValidDateValue(normalizedValue) ? normalizedValue : 'INVALID_DATE';
+};
+
 export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   activeTab,
   headerTitle = 'Add new Property',
+  mode = 'create',
   onBackPress,
-  onSubmitPress,
+  onPropertySaved,
   onTabPress,
+  property,
   submitLabel = 'ADD NEW PROPERTY',
 }) => {
   const responsive = useResponsive();
-  const [propertyName, setPropertyName] = useState('');
-  const [bedrooms, setBedrooms] = useState('01');
-  const [bathrooms, setBathrooms] = useState('01');
-  const [location, setLocation] = useState('');
-  const [gallery, setGallery] = useState('');
-  const [description, setDescription] = useState('');
+  const [propertyName, setPropertyName] = useState(property?.title ?? '');
+  const [propertyTypeIndex, setPropertyTypeIndex] = useState(() => {
+    const index = propertyTypeOptions.indexOf(property?.propertyType ?? 'Apartment');
+    return index >= 0 ? index : 0;
+  });
+  const [listingTypeIndex, setListingTypeIndex] = useState(() => {
+    const index = listingTypeOptions.indexOf(property?.listingType ?? 'For Rent');
+    return index >= 0 ? index : 0;
+  });
+  const [bedrooms, setBedrooms] = useState(
+    property ? String(property.bedrooms) : '01',
+  );
+  const [bathrooms, setBathrooms] = useState(
+    property ? String(property.bathrooms) : '01',
+  );
+  const [monthlyRent, setMonthlyRent] = useState(
+    formatMoneyValue(property?.monthlyRent),
+  );
+  const [availableFrom, setAvailableFrom] = useState(
+    formatDateValue(property?.availableFrom),
+  );
+  const [availableTo, setAvailableTo] = useState(
+    formatDateValue(property?.availableTo),
+  );
+  const [amenities, setAmenities] = useState(property?.amenities.join(', ') ?? '');
+  const [location, setLocation] = useState(property?.locationText ?? '');
+  const [latitude, setLatitude] = useState(formatCoordinateValue(property?.latitude));
+  const [longitude, setLongitude] = useState(
+    formatCoordinateValue(property?.longitude),
+  );
+  const [gallery, setGallery] = useState(property?.galleryUrls.join(', ') ?? '');
+  const [description, setDescription] = useState(property?.description ?? '');
+  const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'error'>(
+    'idle',
+  );
+  const [inlineMessage, setInlineMessage] = useState<string | null>(null);
+
+  const handleSubmit = async () => {
+    if (!propertyName.trim() || !location.trim()) {
+      setSubmitState('error');
+      setInlineMessage('Please complete at least the property name and location.');
+      return;
+    }
+
+    const bedroomsValue = Number(bedrooms);
+    const bathroomsValue = Number(bathrooms);
+
+    if (!Number.isFinite(bedroomsValue) || bedroomsValue <= 0) {
+      setSubmitState('error');
+      setInlineMessage('Please enter a valid number of bedrooms.');
+      return;
+    }
+
+    if (!Number.isFinite(bathroomsValue) || bathroomsValue <= 0) {
+      setSubmitState('error');
+      setInlineMessage('Please enter a valid number of bathrooms.');
+      return;
+    }
+
+    const parsedMonthlyRent = parseMoneyValue(monthlyRent);
+
+    if (Number.isNaN(parsedMonthlyRent)) {
+      setSubmitState('error');
+      setInlineMessage('Monthly rent must be a valid number greater than or equal to 0.');
+      return;
+    }
+
+    const normalizedAvailableFrom = normalizeDateValue(availableFrom);
+    const normalizedAvailableTo = normalizeDateValue(availableTo);
+
+    if (normalizedAvailableFrom === 'INVALID_DATE') {
+      setSubmitState('error');
+      setInlineMessage('Available from must use the YYYY-MM-DD date format.');
+      return;
+    }
+
+    if (normalizedAvailableTo === 'INVALID_DATE') {
+      setSubmitState('error');
+      setInlineMessage('Available to must use the YYYY-MM-DD date format.');
+      return;
+    }
+
+    if (
+      normalizedAvailableFrom &&
+      normalizedAvailableTo &&
+      normalizedAvailableTo < normalizedAvailableFrom
+    ) {
+      setSubmitState('error');
+      setInlineMessage('Available to must be on or after available from.');
+      return;
+    }
+
+    const parsedLatitude = parseCoordinateValue(latitude);
+    const parsedLongitude = parseCoordinateValue(longitude);
+    const hasLatitude = latitude.trim().length > 0;
+    const hasLongitude = longitude.trim().length > 0;
+
+    if (hasLatitude !== hasLongitude) {
+      setSubmitState('error');
+      setInlineMessage('Add both latitude and longitude, or leave both empty.');
+      return;
+    }
+
+    if (
+      hasLatitude &&
+      (parsedLatitude === null ||
+        !Number.isFinite(parsedLatitude) ||
+        parsedLatitude < -90 ||
+        parsedLatitude > 90)
+    ) {
+      setSubmitState('error');
+      setInlineMessage('Latitude must be a valid number between -90 and 90.');
+      return;
+    }
+
+    if (
+      hasLongitude &&
+      (parsedLongitude === null ||
+        !Number.isFinite(parsedLongitude) ||
+        parsedLongitude < -180 ||
+        parsedLongitude > 180)
+    ) {
+      setSubmitState('error');
+      setInlineMessage('Longitude must be a valid number between -180 and 180.');
+      return;
+    }
+
+    const session = getAuthSession();
+    if (!session?.token) {
+      setSubmitState('error');
+      setInlineMessage('Please sign in again before saving this property.');
+      return;
+    }
+
+    const payload: SavePropertyParams = {
+      title: propertyName.trim(),
+      propertyType: propertyTypeOptions[propertyTypeIndex],
+      listingType: listingTypeOptions[listingTypeIndex],
+      bedrooms: bedroomsValue,
+      bathrooms: bathroomsValue,
+      monthlyRent: parsedMonthlyRent,
+      availableFrom: normalizedAvailableFrom,
+      availableTo: normalizedAvailableTo,
+      amenities: parseCommaSeparatedValues(amenities),
+      locationText: location.trim(),
+      latitude: hasLatitude ? parsedLatitude ?? undefined : undefined,
+      longitude: hasLongitude ? parsedLongitude ?? undefined : undefined,
+      galleryUrls: parseCommaSeparatedValues(gallery),
+      description: description.trim(),
+    };
+
+    setSubmitState('loading');
+    setInlineMessage(null);
+
+    try {
+      const savedProperty =
+        mode === 'edit' && property
+          ? await updateProperty(session.token, property.id, payload)
+          : await createProperty(session.token, payload);
+
+      setSubmitState('idle');
+      setInlineMessage(
+        mode === 'edit'
+          ? 'Property updated successfully.'
+          : 'Property created successfully.',
+      );
+      onPropertySaved?.(savedProperty);
+    } catch (error) {
+      setSubmitState('error');
+      setInlineMessage(
+        error instanceof Error
+          ? error.message
+          : 'Unable to save this property right now.',
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -112,8 +360,21 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 value={propertyName}
               />
 
-              <SelectField label="Property Type" value="Apartment" />
-              <SelectField label="Listing Type" value="For Rent" />
+              <SelectField
+                label="Property Type"
+                onPress={() =>
+                  setPropertyTypeIndex(current => (current + 1) % propertyTypeOptions.length)
+                }
+                value={propertyTypeOptions[propertyTypeIndex]}
+              />
+
+              <SelectField
+                label="Listing Type"
+                onPress={() =>
+                  setListingTypeIndex(current => (current + 1) % listingTypeOptions.length)
+                }
+                value={listingTypeOptions[listingTypeIndex]}
+              />
 
               <TextField
                 keyboardType="number-pad"
@@ -131,7 +392,39 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 value={bathrooms}
               />
 
-              <SelectField label="Amenities & Facilities" value="Parking" />
+              <TextField
+                keyboardType="decimal-pad"
+                label="Monthly Rent (LKR)"
+                onChangeText={setMonthlyRent}
+                placeholder="45000"
+                value={monthlyRent}
+              />
+
+              <TextField
+                label="Available From"
+                onChangeText={setAvailableFrom}
+                placeholder="YYYY-MM-DD"
+                value={availableFrom}
+              />
+
+              <TextField
+                label="Available To"
+                onChangeText={setAvailableTo}
+                placeholder="YYYY-MM-DD"
+                value={availableTo}
+              />
+
+              <Text style={styles.helperText}>
+                Use YYYY-MM-DD for the available time period. Leave the dates empty
+                if the property is available anytime.
+              </Text>
+
+              <TextField
+                label="Amenities & Facilities"
+                onChangeText={setAmenities}
+                placeholder="Parking, WiFi, Pool"
+                value={amenities}
+              />
 
               <TextField
                 label="Location"
@@ -140,11 +433,32 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 value={location}
               />
 
+              <TextField
+                keyboardType="decimal-pad"
+                label="Latitude"
+                onChangeText={setLatitude}
+                placeholder="6.927100"
+                value={latitude}
+              />
+
+              <TextField
+                keyboardType="decimal-pad"
+                label="Longitude"
+                onChangeText={setLongitude}
+                placeholder="79.861200"
+                value={longitude}
+              />
+
+              <Text style={styles.helperText}>
+                Add exact latitude and longitude to place the property at its real
+                map position.
+              </Text>
+
               <LargeField
-                label="Gallery"
+                label="Gallery URLs"
                 minHeight={96}
                 onChangeText={setGallery}
-                placeholder="Add Property Images"
+                placeholder="Paste image URLs separated by commas or new lines"
                 value={gallery}
               />
 
@@ -156,11 +470,29 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 value={description}
               />
 
+              {inlineMessage ? (
+                <Text
+                  style={[
+                    styles.inlineMessage,
+                    submitState === 'error'
+                      ? styles.inlineMessageError
+                      : styles.inlineMessageSuccess,
+                  ]}>
+                  {inlineMessage}
+                </Text>
+              ) : null}
+
               <Pressable
                 accessibilityRole="button"
-                onPress={onSubmitPress ?? onBackPress}
-                style={styles.submitButton}>
-                <Text style={styles.submitButtonText}>{submitLabel}</Text>
+                onPress={handleSubmit}
+                style={({pressed}) => [
+                  styles.submitButton,
+                  submitState === 'loading' ? styles.submitButtonLoading : null,
+                  pressed ? styles.pressed : null,
+                ]}>
+                <Text style={styles.submitButtonText}>
+                  {submitState === 'loading' ? 'SAVING...' : submitLabel}
+                </Text>
               </Pressable>
             </View>
           </ScrollView>
@@ -195,11 +527,11 @@ const TextField: React.FC<TextFieldProps> = ({
   );
 };
 
-const SelectField: React.FC<SelectFieldProps> = ({label, value}) => {
+const SelectField: React.FC<SelectFieldProps> = ({label, onPress, value}) => {
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <Pressable accessibilityRole="button" style={styles.selectField}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={styles.selectField}>
         <Text numberOfLines={1} style={styles.selectValue}>
           {value}
         </Text>
@@ -293,7 +625,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   input: {
-    minHeight: 30,
+    minHeight: 42,
     borderWidth: 1,
     borderColor: '#E1E1E1',
     borderRadius: 8,
@@ -313,7 +645,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   selectField: {
-    minHeight: 30,
+    minHeight: 42,
     borderWidth: 1,
     borderColor: '#E1E1E1',
     borderRadius: 8,
@@ -331,10 +663,32 @@ const styles = StyleSheet.create({
   },
   selectValue: {
     flex: 1,
-    color: '#B6B1AB',
+    color: colors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 14,
     marginRight: spacing.sm,
+  },
+  inlineMessage: {
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  helperText: {
+    color: '#7B756E',
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: -2,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  inlineMessageError: {
+    color: colors.error,
+  },
+  inlineMessageSuccess: {
+    color: colors.success,
   },
   submitButton: {
     minHeight: 58,
@@ -344,10 +698,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.sm + 2,
   },
+  submitButtonLoading: {
+    opacity: 0.8,
+  },
   submitButtonText: {
     color: colors.white,
     fontFamily: fonts.semibold,
     fontSize: 14,
     letterSpacing: 0.4,
+  },
+  pressed: {
+    opacity: 0.88,
   },
 });

@@ -24,30 +24,53 @@ import ProfileIcon from '../assets/images/iconamoon_profile-light.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, radii, spacing} from '../theme';
+import {PropertyRecord} from '../services/properties';
+import {PropertyBookingDraft} from '../types/propertyBooking';
+import {colors, fonts, spacing} from '../theme';
+import {
+  formatPropertyAvailability,
+  formatPropertyRent,
+} from '../utils/propertyPresentation';
 
 const cardFontFamily = Platform.OS === 'android' ? 'Roboto' : fonts.regular;
 
 type PropertyPaymentScreenProps = {
   activeTab: AppTab;
+  bookingDraft: PropertyBookingDraft;
   onBack: () => void;
   onBookNow: () => void;
   onTabPress: (tab: AppTab) => void;
+  property: PropertyRecord;
+};
+
+type InputFieldProps = {
+  icon: React.ReactNode;
+  keyboardType?: 'default' | 'email-address';
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  value: string;
+};
+
+type SummaryRowProps = {
+  label: string;
+  value: string;
 };
 
 export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
   activeTab,
+  bookingDraft,
   onBack,
   onBookNow,
   onTabPress,
+  property,
 }) => {
   const responsive = useResponsive();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [cardNumber, setCardNumber] = useState('0085 7789 2236 3685');
-  const [cardHolderName, setCardHolderName] = useState('John smith');
-  const [expiryDate, setExpiryDate] = useState('06/22');
-  const [cvv, setCvv] = useState('321');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
+  const [cvv, setCvv] = useState('');
 
   const handleCardNumberChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, '').slice(0, 16);
@@ -89,18 +112,37 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 style={styles.backButton}>
                 <LeftArrowIcon height={18} width={18} />
               </Pressable>
-              <Text style={styles.headerTitle}>Booking</Text>
+              <Text style={styles.headerTitle}>Payment</Text>
               <View style={styles.headerSpacer} />
             </View>
 
             <View style={styles.paymentSummaryCard}>
-              <Text style={styles.sectionTitle}>Payment Summary</Text>
-              <SummaryRow label="Subtotal" value="LKR 501500" />
-              <SummaryRow label="Discount Total" value="- LKR 1500" />
+              <Text style={styles.sectionTitle}>Booking Summary</Text>
+              <SummaryRow label="Property" value={property.title} />
+              <SummaryRow label="Property code" value={property.propertyCode} />
+              <SummaryRow label="Listing type" value={property.listingType} />
               <SummaryRow
-                highlight
-                label="Total Payment"
-                value="LKR 500000"
+                label="Monthly Rent"
+                value={formatPropertyRent(property.monthlyRent)}
+              />
+              <SummaryRow
+                label="Available"
+                value={formatPropertyAvailability(
+                  property.availableFrom,
+                  property.availableTo,
+                )}
+              />
+              <SummaryRow
+                label="Stay dates"
+                value={
+                  bookingDraft.checkIn && bookingDraft.checkOut
+                    ? `${bookingDraft.checkIn} - ${bookingDraft.checkOut}`
+                    : 'Not added yet'
+                }
+              />
+              <SummaryRow
+                label="Guests"
+                value={String(bookingDraft.guestCount)}
               />
             </View>
 
@@ -120,9 +162,9 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
             />
 
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Non-refundable</Text>
+              <Text style={styles.noticeTitle}>Payment details</Text>
               <Text style={styles.noticeText}>
-                You can not refund your payment when you can...
+                Enter your payment details to finish this booking request.
               </Text>
             </View>
 
@@ -153,7 +195,7 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 <TextInput
                   keyboardType="number-pad"
                   onChangeText={handleCardNumberChange}
-                  placeholder="0085 7789 2236 3685"
+                  placeholder="0000 0000 0000 0000"
                   placeholderTextColor="rgba(255, 255, 255, 0.96)"
                   selectionColor={colors.white}
                   style={[styles.cardValueInput, styles.cardNumberInput]}
@@ -169,7 +211,7 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 <TextInput
                   autoCapitalize="words"
                   onChangeText={setCardHolderName}
-                  placeholder="John smith"
+                  placeholder="Name on card"
                   placeholderTextColor="rgba(255, 255, 255, 0.96)"
                   selectionColor={colors.white}
                   style={[styles.cardValueInput, styles.cardHolderInput]}
@@ -185,7 +227,7 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 <TextInput
                   keyboardType="number-pad"
                   onChangeText={handleExpiryChange}
-                  placeholder="06/22"
+                  placeholder="MM/YY"
                   placeholderTextColor="rgba(255, 255, 255, 0.96)"
                   selectionColor={colors.white}
                   style={[styles.cardValueInput, styles.expiryInput]}
@@ -199,7 +241,7 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 <TextInput
                   keyboardType="number-pad"
                   onChangeText={handleCvvChange}
-                  placeholder="321"
+                  placeholder="000"
                   placeholderTextColor="rgba(255, 255, 255, 0.96)"
                   selectionColor={colors.white}
                   style={[styles.cardValueInput, styles.cvvInput]}
@@ -215,7 +257,7 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
               accessibilityRole="button"
               onPress={onBookNow}
               style={styles.bookNowButton}>
-              <Text style={styles.bookNowButtonText}>Book Now</Text>
+              <Text style={styles.bookNowButtonText}>Submit Booking</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -224,14 +266,6 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
       </View>
     </SafeAreaView>
   );
-};
-
-type InputFieldProps = {
-  icon: React.ReactNode;
-  keyboardType?: 'default' | 'email-address';
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  value: string;
 };
 
 const InputField: React.FC<InputFieldProps> = ({
@@ -256,29 +290,11 @@ const InputField: React.FC<InputFieldProps> = ({
   );
 };
 
-type SummaryRowProps = {
-  highlight?: boolean;
-  label: string;
-  value: string;
-};
-
-const SummaryRow: React.FC<SummaryRowProps> = ({highlight, label, value}) => {
+const SummaryRow: React.FC<SummaryRowProps> = ({label, value}) => {
   return (
     <View style={styles.summaryRow}>
-      <Text
-        style={[
-          styles.summaryLabel,
-          highlight ? styles.summaryLabelStrong : null,
-        ]}>
-        {label}
-      </Text>
-      <Text
-        style={[
-          styles.summaryValue,
-          highlight ? styles.summaryValueHighlight : null,
-        ]}>
-        {value}
-      </Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
     </View>
   );
 };
@@ -348,23 +364,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   summaryLabel: {
     color: colors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 15,
   },
-  summaryLabelStrong: {
-    fontFamily: fonts.bold,
-  },
   summaryValue: {
     color: '#969696',
     fontFamily: fonts.regular,
     fontSize: 15,
-  },
-  summaryValueHighlight: {
-    color: colors.accent,
-    fontFamily: fonts.medium,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   inputWrap: {
     minHeight: 54,
@@ -430,11 +442,6 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     ...StyleSheet.absoluteFillObject,
-  },
-  cardChipWrap: {
-    width: 29,
-    height: 21,
-    position: 'relative',
   },
   cardChipBg: {
     position: 'absolute',

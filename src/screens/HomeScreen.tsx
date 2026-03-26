@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {useTenantProperties} from '../hooks/useTenantProperties';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 import MenuIcon from '../assets/images/menu 1.svg';
@@ -34,6 +35,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const {errorMessage, loading, properties} = useTenantProperties();
+  const featuredProperty = properties[0] ?? null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -113,6 +116,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
             <Text style={styles.sectionTitle}>LATEST PROPERTIES</Text>
 
+            {loading ? (
+              <Text style={styles.stateText}>Loading latest properties...</Text>
+            ) : errorMessage ? (
+              <Text style={styles.stateText}>{errorMessage}</Text>
+            ) : !featuredProperty ? (
+              <Text style={styles.stateText}>
+                No live properties are available right now.
+              </Text>
+            ) : null}
+
             <View
               style={[
                 styles.propertiesRow,
@@ -139,19 +152,22 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                   <View style={styles.mainCardContent}>
                     <Text style={styles.propertyTitle}>
-                      {home.featuredProperty.title}
+                      {featuredProperty?.title ?? 'No property available'}
                     </Text>
                     <Text style={styles.propertyDescription}>
-                      {home.featuredProperty.description}
+                      {featuredProperty
+                        ? featuredProperty.description ||
+                          `${featuredProperty.propertyType} in ${featuredProperty.locationText}`
+                        : 'Check back later for the latest published rental properties.'}
                     </Text>
                   </View>
                 </View>
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={home.onBookNowPress}
+                  onPress={onSearchPress}
                   style={styles.bookNowButton}>
-                  <Text style={styles.bookNowText}>Book now</Text>
+                  <Text style={styles.bookNowText}>View properties</Text>
                 </Pressable>
               </View>
 
@@ -278,6 +294,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: fonts.heavy,
     fontSize: 18,
+    marginBottom: spacing.md,
+  },
+  stateText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
     marginBottom: spacing.md,
   },
   propertiesRow: {

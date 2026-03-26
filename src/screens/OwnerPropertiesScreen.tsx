@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  DimensionValue,
   Platform,
   Pressable,
   SafeAreaView,
@@ -10,50 +9,23 @@ import {
   Text,
   View,
 } from 'react-native';
-import {AppBottomNav, AppTab} from '../components/AppBottomNav';
-import {useHomeScreen} from '../hooks/useHomeScreen';
-import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, radii, spacing} from '../theme';
 import MenuIcon from '../assets/images/menu 1.svg';
 import ProfilePic from '../assets/images/profile_pic.svg';
 import PlayIcon from '../assets/images/20 1.svg';
-import MapImage from '../assets/images/Map.svg';
-import PlusButton from '../assets/images/Button_ plus.svg';
-import MinusButton from '../assets/images/Button_ minus.svg';
+import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {OwnerPropertiesMap} from '../components/OwnerPropertiesMap';
+import {useHomeScreen} from '../hooks/useHomeScreen';
+import {useOwnerProperties} from '../hooks/useOwnerProperties';
+import {useResponsive} from '../hooks/useResponsive';
+import {PropertyRecord} from '../services/properties';
+import {colors, fonts, radii, spacing} from '../theme';
 
 type OwnerPropertiesScreenProps = {
   activeTab: AppTab;
   onAddNewPropertyPress: () => void;
-  onViewPropertyPress: (title: string) => void;
+  onViewPropertyPress: (property: PropertyRecord) => void;
   onTabPress: (tab: AppTab) => void;
 };
-
-type OwnerProperty = {
-  id: string;
-  code: string;
-  title: string;
-};
-
-type MapMarker = {
-  id: string;
-  label: string;
-  left: DimensionValue;
-  top: DimensionValue;
-};
-
-const ownerProperties: OwnerProperty[] = [
-  {id: 'property-1', title: 'Colombo Lux House', code: '#PRO001'},
-  {id: 'property-2', title: 'Colombo Lux House', code: '#PRO002'},
-  {id: 'property-3', title: 'Colombo Lux House', code: '#PRO003'},
-  {id: 'property-4', title: 'Colombo Lux House', code: '#PRO004'},
-];
-
-const mapMarkers: MapMarker[] = [
-  {id: 'marker-04', label: '04', left: '42%', top: '28%'},
-  {id: 'marker-03', label: '03', left: '47%', top: '56%'},
-  {id: 'marker-02', label: '02', left: '71%', top: '47%'},
-  {id: 'marker-01', label: '1', left: '86%', top: '71%'},
-];
 
 export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
   activeTab,
@@ -64,6 +36,7 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const {errorMessage: inlineMessage, loading, properties} = useOwnerProperties();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -112,51 +85,40 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
             <View style={styles.mapCard}>
               <View
                 style={[
-                  styles.mapImageWrap,
+                  styles.mapWrap,
                   {height: responsive.isTablet ? 320 : 246},
                 ]}>
-                <MapImage
-                  height="100%"
-                  preserveAspectRatio="xMidYMid slice"
-                  style={styles.mapImage}
-                  width="100%"
-                />
-
-                {mapMarkers.map(marker => (
-                  <View
-                    key={marker.id}
-                    style={[
-                      styles.mapMarker,
-                      {left: marker.left, top: marker.top},
-                    ]}>
-                    <Text style={styles.mapMarkerText}>{marker.label}</Text>
-                  </View>
-                ))}
-
-                <View style={styles.mapControls}>
-                  <Pressable accessibilityRole="button" style={styles.mapControlButton}>
-                    <PlusButton height={40} width={37} />
-                  </Pressable>
-                  <Pressable accessibilityRole="button" style={styles.mapControlButton}>
-                    <MinusButton height={40} width={37} />
-                  </Pressable>
-                </View>
+                <OwnerPropertiesMap properties={properties} />
               </View>
             </View>
+
+            {inlineMessage ? (
+              <View style={styles.messageCard}>
+                <Text style={styles.messageText}>{inlineMessage}</Text>
+              </View>
+            ) : null}
 
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>My Properties</Text>
 
-              <View style={styles.propertyList}>
-                {ownerProperties.map(property => (
-                  <OwnerPropertyCard
-                    key={property.id}
-                    code={property.code}
-                    onPress={() => onViewPropertyPress(property.title)}
-                    title={property.title}
-                  />
-                ))}
-              </View>
+              {loading ? (
+                <Text style={styles.loadingText}>Loading your properties...</Text>
+              ) : properties.length === 0 ? (
+                <Text style={styles.emptyListText}>
+                  You have not added any properties yet.
+                </Text>
+              ) : (
+                <View style={styles.propertyList}>
+                  {properties.map(property => (
+                    <OwnerPropertyCard
+                      code={property.propertyCode}
+                      key={property.id}
+                      onPress={() => onViewPropertyPress(property)}
+                      title={property.title}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           </View>
         </ScrollView>
@@ -276,40 +238,24 @@ const styles = StyleSheet.create({
     padding: spacing.sm + 2,
     marginBottom: spacing.sm,
   },
-  mapImageWrap: {
+  mapWrap: {
     borderRadius: 10,
     overflow: 'hidden',
-    position: 'relative',
   },
-  mapImage: {
-    ...StyleSheet.absoluteFillObject,
+  messageCard: {
+    borderRadius: 12,
+    backgroundColor: '#F4E8D8',
+    borderWidth: 1,
+    borderColor: '#E0CFB7',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 4,
+    marginBottom: spacing.sm,
   },
-  mapControls: {
-    position: 'absolute',
-    right: spacing.md,
-    top: spacing.md,
-    gap: spacing.sm,
-  },
-  mapControlButton: {
-    borderRadius: 10,
-  },
-  mapMarker: {
-    position: 'absolute',
-    width: 54,
-    height: 54,
-    marginLeft: -27,
-    marginTop: -27,
-    borderRadius: 27,
-    borderWidth: 6,
-    borderColor: colors.primary,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapMarkerText: {
-    color: colors.textPrimary,
-    fontFamily: fonts.semibold,
-    fontSize: 16,
+  messageText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
   },
   sectionCard: {
     backgroundColor: '#FCF4E9',
@@ -323,6 +269,17 @@ const styles = StyleSheet.create({
     fontFamily: fonts.medium,
     fontSize: 18,
     marginBottom: spacing.md,
+  },
+  loadingText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
+  emptyListText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
   },
   propertyList: {
     gap: spacing.sm,

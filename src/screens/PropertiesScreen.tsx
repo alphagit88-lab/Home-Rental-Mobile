@@ -1,4 +1,4 @@
-import React, {useMemo, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   GestureResponderEvent,
   LayoutChangeEvent,
@@ -11,6 +11,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import MenuIcon from '../assets/images/menu 1.svg';
@@ -24,66 +25,122 @@ import WifiIcon from '../assets/images/eva_wifi-fill.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {useTenantProperties} from '../hooks/useTenantProperties';
+import {useResponsive} from '../hooks/useResponsive';
+import {PropertyRecord} from '../services/properties';
+import {PropertyBookingDraft} from '../types/propertyBooking';
+import {colors, fonts, radii, spacing} from '../theme';
+import {
+  formatPropertyAvailabilityChip,
+  formatPropertyRentCompact,
+} from '../utils/propertyPresentation';
 import {PropertyBookingScreen} from './PropertyBookingScreen';
 import {PropertyDetailsScreen} from './PropertyDetailsScreen';
 import {PropertyPaymentScreen} from './PropertyPaymentScreen';
-import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, radii, spacing} from '../theme';
 
 type PropertiesScreenProps = {
   activeTab: AppTab;
   onTabPress: (tab: AppTab) => void;
 };
 
-const propertyCards = [
-  {
-    id: 'lux-house-1',
-    title: 'Colombo Lux House',
-    bedrooms: '1 bedroom',
-    baths: '1 bath',
-  },
-  {
-    id: 'lux-house-2',
-    title: 'Colombo Lux House',
-    bedrooms: '2 bedroom',
-    baths: '2 bath',
-  },
-  {
-    id: 'lux-house-3',
-    title: 'Colombo Lux House',
-    bedrooms: '1 bedroom',
-    baths: '1 bath',
-  },
-];
+type SortOption = 'Newest' | 'A-Z' | 'Bedrooms' | 'Bathrooms';
 
-const filterChips = [
-  {label: 'Filters', tone: 'muted' as const},
-  {label: 'Apartment', tone: 'accent' as const},
-  {label: 'House', tone: 'neutral' as const},
-  {label: 'Room / Boarding', tone: 'accent' as const},
-];
-
-const sortByOptions = ['Best Match', 'Nearest', 'Low Budget'];
-const propertyTypeOptions = ['Apartment', 'House', 'Room / Boarding'];
-const listingTypeOptions = ['For Rent', 'Short-term'];
-const ratingsOptions = ['Below 4', '4 to 6', '6 to 10'];
-const includeOptions = [
-  'Garden',
-  'Furnished',
-  'Parking',
-  'Pool',
-  'Pets Allowed',
-  'Hot Water',
-  'CCTV',
-];
-const defaultPropertyTypes = ['House', 'Room / Boarding'];
-const defaultRatings = ['4 to 6', '6 to 10'];
-const defaultIncludes = ['Garden', 'Parking', 'Pool', 'Pets Allowed', 'CCTV'];
-const defaultDistanceRange: [number, number] = [8, 20];
-const defaultBudgetRange: [number, number] = [50, 100];
-
+const sortByOptions: SortOption[] = ['Newest', 'A-Z', 'Bedrooms', 'Bathrooms'];
+const propertyTypeDefaults = ['Apartment', 'House', 'Room / Boarding'];
+const listingTypeDefaults = ['For Rent', 'Short-term'];
 const SLIDER_THUMB_SIZE = 18;
 const SLIDER_TOUCH_SIZE = 32;
+
+const createBookingDraft = (): PropertyBookingDraft => ({
+  checkIn: '',
+  checkOut: '',
+  guestCount: 1,
+});
+
+const uniqueValues = (values: string[]) =>
+  Array.from(new Set(values.filter(value => value.trim().length > 0)));
+
+const toggleValue = (values: string[], value: string) =>
+  values.includes(value)
+    ? values.filter(item => item !== value)
+    : [...values, value];
+
+const buildSearchText = (property: PropertyRecord) =>
+  [
+    property.title,
+    property.locationText,
+    property.propertyCode,
+    property.propertyType,
+    property.listingType,
+    property.monthlyRent === null ? '' : String(property.monthlyRent),
+    property.availableFrom ?? '',
+    property.availableTo ?? '',
+    property.description,
+    property.amenities.join(' '),
+  ]
+    .join(' ')
+    .toLowerCase();
+
+const sortProperties = (properties: PropertyRecord[], sortBy: SortOption) => {
+  const sortedProperties = [...properties];
+
+  if (sortBy === 'A-Z') {
+    return sortedProperties.sort((first, second) =>
+      first.title.localeCompare(second.title),
+    );
+  }
+
+  if (sortBy === 'Bedrooms') {
+    return sortedProperties.sort((first, second) => {
+      if (second.bedrooms !== first.bedrooms) {
+        return second.bedrooms - first.bedrooms;
+      }
+
+      return second.id - first.id;
+    });
+  }
+
+  if (sortBy === 'Bathrooms') {
+    return sortedProperties.sort((first, second) => {
+      if (second.bathrooms !== first.bathrooms) {
+        return second.bathrooms - first.bathrooms;
+      }
+
+      return second.id - first.id;
+    });
+  }
+
+  return sortedProperties.sort((first, second) => {
+    const firstTimestamp = first.createdAt ? Date.parse(first.createdAt) : 0;
+    const secondTimestamp = second.createdAt ? Date.parse(second.createdAt) : 0;
+
+    return secondTimestamp - firstTimestamp || second.id - first.id;
+  });
+};
+
+const getMetaText = (property: PropertyRecord) =>
+  [property.locationText, property.propertyType]
+    .filter(Boolean)
+    .join(' | ');
+
+const getAmenityLabel = (property: PropertyRecord) =>
+  property.amenities.find(amenity => /wi[\s-]?fi|internet/i.test(amenity)) ??
+  property.amenities[0] ??
+  'Details';
+
+const shouldUseWifiIcon = (label: string) => /wi[\s-]?fi|internet/i.test(label);
+
+const getFooterDetails = (property: PropertyRecord) =>
+  property.monthlyRent === null
+    ? {label: 'code', value: property.propertyCode}
+    : {label: 'rent', value: formatPropertyRentCompact(property.monthlyRent)};
+
+const getAvailabilityTagLabel = (property: PropertyRecord) =>
+  formatPropertyAvailabilityChip(
+    property.availableFrom,
+    property.availableTo,
+    property.listingType,
+  );
 
 export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   activeTab,
@@ -92,46 +149,150 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const {errorMessage, loading, properties, reload} = useTenantProperties();
   const [detailVisible, setDetailVisible] = useState(false);
   const [bookingVisible, setBookingVisible] = useState(false);
   const [paymentVisible, setPaymentVisible] = useState(false);
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [selectedSortBy, setSelectedSortBy] = useState('Nearest');
-  const [selectedPropertyTypes, setSelectedPropertyTypes] =
-    useState(defaultPropertyTypes);
-  const [selectedListingType, setSelectedListingType] = useState('For Rent');
-  const [selectedRatings, setSelectedRatings] = useState(defaultRatings);
-  const [selectedIncludes, setSelectedIncludes] = useState(defaultIncludes);
-  const [distanceRange, setDistanceRange] =
-    useState<[number, number]>(defaultDistanceRange);
-  const [budgetRange, setBudgetRange] =
-    useState<[number, number]>(defaultBudgetRange);
+  const [selectedProperty, setSelectedProperty] = useState<PropertyRecord | null>(
+    null,
+  );
+  const [bookingDraft, setBookingDraft] = useState<PropertyBookingDraft>(
+    createBookingDraft(),
+  );
+  const [searchText, setSearchText] = useState('');
+  const [selectedSortBy, setSelectedSortBy] = useState<SortOption>('Newest');
+  const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>(
+    [],
+  );
+  const [selectedListingType, setSelectedListingType] = useState<string | null>(
+    null,
+  );
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const maximumBedrooms = useMemo(
+    () => Math.max(1, ...properties.map(property => property.bedrooms)),
+    [properties],
+  );
+  const maximumBathrooms = useMemo(
+    () => Math.max(1, ...properties.map(property => property.bathrooms)),
+    [properties],
+  );
+  const [bedroomRange, setBedroomRange] = useState<[number, number]>([1, 1]);
+  const [bathroomRange, setBathroomRange] = useState<[number, number]>([1, 1]);
 
-  const toggleValue = (
-    value: string,
-    setSelectedValues: React.Dispatch<React.SetStateAction<string[]>>,
-  ) => {
-    setSelectedValues(current =>
-      current.includes(value)
-        ? current.filter(item => item !== value)
-        : [...current, value],
+  useEffect(() => {
+    setBedroomRange([1, maximumBedrooms]);
+  }, [maximumBedrooms]);
+
+  useEffect(() => {
+    setBathroomRange([1, maximumBathrooms]);
+  }, [maximumBathrooms]);
+
+  const propertyTypeOptions = useMemo(
+    () =>
+      uniqueValues([
+        ...propertyTypeDefaults,
+        ...properties.map(property => property.propertyType),
+      ]),
+    [properties],
+  );
+  const listingTypeOptions = useMemo(
+    () =>
+      uniqueValues([
+        ...listingTypeDefaults,
+        ...properties.map(property => property.listingType),
+      ]),
+    [properties],
+  );
+  const amenityOptions = useMemo(
+    () =>
+      uniqueValues(properties.flatMap(property => property.amenities)).sort(
+        (first, second) => first.localeCompare(second),
+      ),
+    [properties],
+  );
+
+  const visibleProperties = useMemo(() => {
+    const normalizedSearchText = searchText.trim().toLowerCase();
+
+    return sortProperties(
+      properties.filter(property => {
+        if (
+          normalizedSearchText.length > 0 &&
+          !buildSearchText(property).includes(normalizedSearchText)
+        ) {
+          return false;
+        }
+
+        if (
+          selectedPropertyTypes.length > 0 &&
+          !selectedPropertyTypes.includes(property.propertyType)
+        ) {
+          return false;
+        }
+
+        if (
+          selectedListingType &&
+          property.listingType !== selectedListingType
+        ) {
+          return false;
+        }
+
+        if (
+          property.bedrooms < bedroomRange[0] ||
+          property.bedrooms > bedroomRange[1]
+        ) {
+          return false;
+        }
+
+        if (
+          property.bathrooms < bathroomRange[0] ||
+          property.bathrooms > bathroomRange[1]
+        ) {
+          return false;
+        }
+
+        if (
+          selectedAmenities.length > 0 &&
+          !selectedAmenities.every(amenity => property.amenities.includes(amenity))
+        ) {
+          return false;
+        }
+
+        return true;
+      }),
+      selectedSortBy,
     );
-  };
+  }, [
+    bathroomRange,
+    bedroomRange,
+    properties,
+    searchText,
+    selectedAmenities,
+    selectedListingType,
+    selectedPropertyTypes,
+    selectedSortBy,
+  ]);
 
   const resetFilters = () => {
-    setSelectedSortBy('Nearest');
-    setSelectedPropertyTypes(defaultPropertyTypes);
-    setSelectedListingType('For Rent');
-    setSelectedRatings(defaultRatings);
-    setSelectedIncludes(defaultIncludes);
-    setDistanceRange(defaultDistanceRange);
-    setBudgetRange(defaultBudgetRange);
+    setSelectedSortBy('Newest');
+    setSelectedPropertyTypes([]);
+    setSelectedListingType(null);
+    setSelectedAmenities([]);
+    setBedroomRange([1, maximumBedrooms]);
+    setBathroomRange([1, maximumBathrooms]);
   };
 
-  if (paymentVisible) {
+  const openPropertyDetails = (property: PropertyRecord) => {
+    setSelectedProperty(property);
+    setDetailVisible(true);
+  };
+
+  if (paymentVisible && selectedProperty) {
     return (
       <PropertyPaymentScreen
         activeTab={activeTab}
+        bookingDraft={bookingDraft}
         onBack={() => setPaymentVisible(false)}
         onBookNow={() => {
           setPaymentVisible(false);
@@ -145,14 +306,16 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           setDetailVisible(false);
           onTabPress(tab);
         }}
+        property={selectedProperty}
       />
     );
   }
 
-  if (bookingVisible) {
+  if (bookingVisible && selectedProperty) {
     return (
       <PropertyBookingScreen
         activeTab={activeTab}
+        bookingDraft={bookingDraft}
         onBack={() => setBookingVisible(false)}
         onNext={() => setPaymentVisible(true)}
         onTabPress={tab => {
@@ -161,11 +324,15 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           setDetailVisible(false);
           onTabPress(tab);
         }}
+        onUpdateBookingDraft={updates =>
+          setBookingDraft(current => ({...current, ...updates}))
+        }
+        property={selectedProperty}
       />
     );
   }
 
-  if (detailVisible) {
+  if (detailVisible && selectedProperty) {
     return (
       <PropertyDetailsScreen
         activeTab={activeTab}
@@ -175,6 +342,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           setDetailVisible(false);
           onTabPress(tab);
         }}
+        property={selectedProperty}
       />
     );
   }
@@ -202,44 +370,76 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
               onProfilePress={home.onProfilePress}
               userName={home.userName}
             />
-            <LocationSearchField />
+            <LocationSearchField
+              onChangeText={setSearchText}
+              value={searchText}
+            />
 
             <View style={styles.dateRow}>
-              <DateInput label="Move-in" value="DD/MM/YY" />
-              <DateInput label="Move-out" value="DD/MM/YY" />
+              <DateInput
+                label="Move-in"
+                onChangeText={value =>
+                  setBookingDraft(current => ({...current, checkIn: value}))
+                }
+                value={bookingDraft.checkIn}
+              />
+              <DateInput
+                label="Move-out"
+                onChangeText={value =>
+                  setBookingDraft(current => ({...current, checkOut: value}))
+                }
+                value={bookingDraft.checkOut}
+              />
             </View>
 
             <View style={styles.filterRow}>
               <FilterChipButton
-                label={filterChips[0].label}
+                label="Filters"
                 muted
                 onPress={() => setFiltersVisible(true)}
               />
-              <FilterChipButton
-                label={filterChips[1].label}
-                selected={selectedPropertyTypes.includes('Apartment')}
-              />
-              <FilterChipButton
-                label={filterChips[2].label}
-                selected={selectedPropertyTypes.includes('House')}
-              />
-              <FilterChipButton
-                label={filterChips[3].label}
-                selected={selectedPropertyTypes.includes('Room / Boarding')}
-              />
-            </View>
-
-            <View style={styles.cardList}>
-              {propertyCards.map(card => (
-                <PropertyCard
-                  onAvailabilityPress={() => setDetailVisible(true)}
-                  key={card.id}
-                  baths={card.baths}
-                  bedrooms={card.bedrooms}
-                  title={card.title}
+              {propertyTypeDefaults.map(option => (
+                <FilterChipButton
+                  key={option}
+                  label={option}
+                  onPress={() =>
+                    setSelectedPropertyTypes(current => toggleValue(current, option))
+                  }
+                  selected={selectedPropertyTypes.includes(option)}
                 />
               ))}
             </View>
+
+            {loading ? (
+              <Text style={styles.infoText}>Loading properties...</Text>
+            ) : errorMessage ? (
+              <Text style={styles.infoText}>{errorMessage}</Text>
+            ) : visibleProperties.length === 0 ? (
+              <Text style={styles.infoText}>
+                No properties match your search or selected filters.
+              </Text>
+            ) : (
+              <View style={styles.cardList}>
+                {visibleProperties.map(property => {
+                  const footerDetails = getFooterDetails(property);
+
+                  return (
+                    <PropertyCard
+                      baths={`${property.bathrooms} bath`}
+                      bedrooms={`${property.bedrooms} bedroom`}
+                      footerLabel={footerDetails.label}
+                      footerValue={footerDetails.value}
+                      key={property.id}
+                      meta={getMetaText(property)}
+                      onAvailabilityPress={() => openPropertyDetails(property)}
+                      tag={getAvailabilityTagLabel(property)}
+                      title={property.title}
+                      highlightLabel={getAmenityLabel(property)}
+                    />
+                  );
+                })}
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -269,7 +469,10 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                     onProfilePress={home.onProfilePress}
                     userName={home.userName}
                   />
-                  <LocationSearchField />
+                  <LocationSearchField
+                    onChangeText={setSearchText}
+                    value={searchText}
+                  />
                 </View>
               </View>
 
@@ -299,8 +502,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                           <FilterChipButton
                             key={option}
                             label={option}
-                            selected={selectedSortBy === option}
                             onPress={() => setSelectedSortBy(option)}
+                            selected={selectedSortBy === option}
                           />
                         ))}
                       </View>
@@ -312,10 +515,12 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                           <FilterChipButton
                             key={option}
                             label={option}
-                            selected={selectedPropertyTypes.includes(option)}
                             onPress={() =>
-                              toggleValue(option, setSelectedPropertyTypes)
+                              setSelectedPropertyTypes(current =>
+                                toggleValue(current, option),
+                              )
                             }
+                            selected={selectedPropertyTypes.includes(option)}
                           />
                         ))}
                       </View>
@@ -327,77 +532,74 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                           <FilterChipButton
                             key={option}
                             label={option}
-                            selected={selectedListingType === option}
-                            onPress={() => setSelectedListingType(option)}
-                          />
-                        ))}
-                      </View>
-                    </FilterSection>
-
-                    <FilterSection title="Distance">
-                      <View style={styles.rangeLabelsRow}>
-                        <Text style={styles.rangeValueText}>
-                          {`${distanceRange[0]} km`}
-                        </Text>
-                        <Text style={styles.rangeValueText}>
-                          {`${distanceRange[1]} km`}
-                        </Text>
-                      </View>
-                      <DualThumbRangeSlider
-                        max={30}
-                        min={0}
-                        onChange={setDistanceRange}
-                        step={1}
-                        values={distanceRange}
-                      />
-                    </FilterSection>
-
-                    <FilterSection title="Budget">
-                      <View style={styles.rangeLabelsRow}>
-                        <Text style={styles.rangeValueText}>
-                          {`LKR ${budgetRange[0]}K`}
-                        </Text>
-                        <Text style={styles.rangeValueText}>
-                          {`LKR ${budgetRange[1]}K`}
-                        </Text>
-                      </View>
-                      <DualThumbRangeSlider
-                        max={150}
-                        min={0}
-                        onChange={setBudgetRange}
-                        step={5}
-                        values={budgetRange}
-                      />
-                    </FilterSection>
-
-                    <FilterSection title="Ratings">
-                      <View style={styles.optionRow}>
-                        {ratingsOptions.map(option => (
-                          <FilterChipButton
-                            key={option}
-                            label={option}
-                            selected={selectedRatings.includes(option)}
                             onPress={() =>
-                              toggleValue(option, setSelectedRatings)
+                              setSelectedListingType(current =>
+                                current === option ? null : option,
+                              )
                             }
+                            selected={selectedListingType === option}
                           />
                         ))}
                       </View>
+                    </FilterSection>
+
+                    <FilterSection title="Bedrooms">
+                      <View style={styles.rangeLabelsRow}>
+                        <Text style={styles.rangeValueText}>
+                          {String(bedroomRange[0])}
+                        </Text>
+                        <Text style={styles.rangeValueText}>
+                          {String(bedroomRange[1])}
+                        </Text>
+                      </View>
+                      <DualThumbRangeSlider
+                        max={maximumBedrooms}
+                        min={1}
+                        onChange={setBedroomRange}
+                        step={1}
+                        values={bedroomRange}
+                      />
+                    </FilterSection>
+
+                    <FilterSection title="Bathrooms">
+                      <View style={styles.rangeLabelsRow}>
+                        <Text style={styles.rangeValueText}>
+                          {String(bathroomRange[0])}
+                        </Text>
+                        <Text style={styles.rangeValueText}>
+                          {String(bathroomRange[1])}
+                        </Text>
+                      </View>
+                      <DualThumbRangeSlider
+                        max={maximumBathrooms}
+                        min={1}
+                        onChange={setBathroomRange}
+                        step={1}
+                        values={bathroomRange}
+                      />
                     </FilterSection>
 
                     <FilterSection title="Include">
-                      <View style={styles.optionRow}>
-                        {includeOptions.map(option => (
-                          <FilterChipButton
-                            key={option}
-                            label={option}
-                            selected={selectedIncludes.includes(option)}
-                            onPress={() =>
-                              toggleValue(option, setSelectedIncludes)
-                            }
-                          />
-                        ))}
-                      </View>
+                      {amenityOptions.length > 0 ? (
+                        <View style={styles.optionRow}>
+                          {amenityOptions.map(option => (
+                            <FilterChipButton
+                              key={option}
+                              label={option}
+                              onPress={() =>
+                                setSelectedAmenities(current =>
+                                  toggleValue(current, option),
+                                )
+                              }
+                              selected={selectedAmenities.includes(option)}
+                            />
+                          ))}
+                        </View>
+                      ) : (
+                        <Text style={styles.infoText}>
+                          No amenities are available to filter yet.
+                        </Text>
+                      )}
                     </FilterSection>
                   </ScrollView>
 
@@ -454,10 +656,24 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
   );
 };
 
-const LocationSearchField: React.FC = () => {
+type LocationSearchFieldProps = {
+  onChangeText: (value: string) => void;
+  value: string;
+};
+
+const LocationSearchField: React.FC<LocationSearchFieldProps> = ({
+  onChangeText,
+  value,
+}) => {
   return (
     <View style={styles.searchField}>
-      <Text style={styles.searchText}>Colombo</Text>
+      <TextInput
+        onChangeText={onChangeText}
+        placeholder="Search properties"
+        placeholderTextColor="#999999"
+        style={styles.searchText}
+        value={value}
+      />
       <SearchIcon height={20} width={20} />
     </View>
   );
@@ -465,15 +681,22 @@ const LocationSearchField: React.FC = () => {
 
 type DateInputProps = {
   label: string;
+  onChangeText: (value: string) => void;
   value: string;
 };
 
-const DateInput: React.FC<DateInputProps> = ({label, value}) => {
+const DateInput: React.FC<DateInputProps> = ({label, onChangeText, value}) => {
   return (
     <View style={styles.dateInputWrap}>
       <Text style={styles.dateInputLabel}>{label}</Text>
       <View style={styles.dateInput}>
-        <Text style={styles.dateInputText}>{value}</Text>
+        <TextInput
+          onChangeText={onChangeText}
+          placeholder="DD/MM/YY"
+          placeholderTextColor="#B1B1B1"
+          style={styles.dateInputText}
+          value={value}
+        />
         <DateIcon height={18} width={18} />
       </View>
     </View>
@@ -483,14 +706,24 @@ const DateInput: React.FC<DateInputProps> = ({label, value}) => {
 type PropertyCardProps = {
   baths: string;
   bedrooms: string;
+  footerLabel: string;
+  footerValue: string;
+  highlightLabel: string;
+  meta: string;
   onAvailabilityPress: () => void;
+  tag: string;
   title: string;
 };
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
   baths,
   bedrooms,
+  footerLabel,
+  footerValue,
+  highlightLabel,
+  meta,
   onAvailabilityPress,
+  tag,
   title,
 }) => {
   return (
@@ -510,22 +743,32 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <View style={styles.amenitiesRow}>
           <Amenity icon={<BedIcon height={15} width={15} />} label={bedrooms} />
           <Amenity icon={<BathIcon height={15} width={15} />} label={baths} />
-          <Amenity icon={<WifiIcon height={15} width={15} />} label="WiFi" />
+          <Amenity
+            icon={
+              shouldUseWifiIcon(highlightLabel) ? (
+                <WifiIcon height={15} width={15} />
+              ) : null
+            }
+            label={highlightLabel}
+          />
         </View>
 
-        <Text style={styles.propertyMeta}>
-          City view | 3rd floor | Elevator | Parking
+        <Text numberOfLines={1} style={styles.propertyMeta}>
+          {meta || 'Location unavailable'}
         </Text>
 
         <Pressable
           accessibilityRole="button"
           onPress={onAvailabilityPress}
           style={styles.availabilityChip}>
-          <Text style={styles.availabilityText}>Available 28 Nov 2021</Text>
+          <Text numberOfLines={1} style={styles.availabilityText}>
+            {tag}
+          </Text>
         </Pressable>
 
         <Text style={styles.propertyPrice}>
-          from <Text style={styles.propertyPriceStrong}>LKR13490</Text> /month
+          {footerLabel}{' '}
+          <Text style={styles.propertyPriceStrong}>{footerValue}</Text>
         </Text>
       </View>
     </View>
@@ -533,7 +776,7 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
 };
 
 type AmenityProps = {
-  icon: React.ReactNode;
+  icon?: React.ReactNode | null;
   label: string;
 };
 
@@ -595,7 +838,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({children, title}) => {
   );
 };
 
-type StaticRangeSliderProps = {
+type DualThumbRangeSliderProps = {
   max: number;
   min: number;
   onChange: (values: [number, number]) => void;
@@ -603,7 +846,7 @@ type StaticRangeSliderProps = {
   values: [number, number];
 };
 
-const DualThumbRangeSlider: React.FC<StaticRangeSliderProps> = ({
+const DualThumbRangeSlider: React.FC<DualThumbRangeSliderProps> = ({
   max,
   min,
   onChange,
@@ -793,13 +1036,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
   },
   searchText: {
+    flex: 1,
     color: colors.textPrimary,
     fontFamily: fonts.medium,
     fontSize: 17,
+    paddingVertical: spacing.sm,
   },
   dateRow: {
     flexDirection: 'row',
@@ -825,12 +1071,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm + 4,
   },
   dateInputText: {
-    color: '#B1B1B1',
+    flex: 1,
+    color: '#4B4B4B',
     fontFamily: fonts.regular,
     fontSize: 16,
+    paddingVertical: 0,
   },
   filterRow: {
     flexDirection: 'row',
@@ -868,6 +1117,13 @@ const styles = StyleSheet.create({
   },
   filterChipTextMuted: {
     color: '#BEBEBE',
+  },
+  infoText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: spacing.md,
   },
   modalPanelWrap: {
     flex: 1,
@@ -1017,6 +1273,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3DDD8',
     overflow: 'hidden',
     borderTopLeftRadius: radii.lg,
+    borderBottomLeftRadius: radii.lg,
   },
   propertyImage: {
     ...StyleSheet.absoluteFillObject,

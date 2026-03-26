@@ -14,14 +14,26 @@ import HeartIcon from '../assets/images/heart 1.svg';
 import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import HeroImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {PropertyMapCard} from '../components/PropertyMapCard';
 import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, radii, spacing} from '../theme';
+import {PropertyRecord} from '../services/properties';
+import {colors, fonts, spacing} from '../theme';
+import {
+  formatPropertyAvailability,
+  formatPropertyRent,
+} from '../utils/propertyPresentation';
 
 type PropertyDetailsScreenProps = {
   activeTab: AppTab;
   onBack: () => void;
   onBookNow: () => void;
   onTabPress: (tab: AppTab) => void;
+  property: PropertyRecord;
+};
+
+type StatColumnProps = {
+  label: string;
+  value: string;
 };
 
 export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
@@ -29,10 +41,15 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
   onBack,
   onBookNow,
   onTabPress,
+  property,
 }) => {
   const responsive = useResponsive();
   const topOverlayOffset =
     Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) + 8 : 18;
+  const amenities = property.amenities;
+  const description =
+    property.description ||
+    `${property.propertyType} in ${property.locationText || 'your selected area'}.`;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -70,10 +87,12 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
               </Pressable>
 
               <View style={styles.heroTextWrap}>
-                <Text style={styles.heroTitle}>Luxury House</Text>
+                <Text style={styles.heroTitle}>{property.title}</Text>
                 <View style={styles.locationRow}>
                   <MapMarkerIcon height={18} width={18} />
-                  <Text style={styles.locationText}>Colombo</Text>
+                  <Text style={styles.locationText}>
+                    {property.locationText || 'Location unavailable'}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -83,21 +102,47 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                 <HeartIcon height={46} width={46} />
               </View>
 
-              <Text style={styles.propertyName}>Colombo Luxury House</Text>
-              <Text style={styles.descriptionText}>
-                Dreamland beach there are white coral rocks that surround the
-                beach, this creates a beautiful view of its own.
-              </Text>
+              <Text style={styles.propertyName}>{property.title}</Text>
+              <Text style={styles.descriptionText}>{description}</Text>
 
-              <Text style={styles.includeTitle}>Include</Text>
-              <Text style={styles.includeText}>• Lorem</Text>
-              <Text style={styles.includeText}>• Lorem Ipsum Lorem</Text>
-              <Text style={styles.includeText}>• Lorem Ipsum</Text>
+              <InfoRow
+                label="Monthly Rent"
+                value={formatPropertyRent(property.monthlyRent)}
+              />
+              <InfoRow
+                label="Available"
+                value={formatPropertyAvailability(
+                  property.availableFrom,
+                  property.availableTo,
+                )}
+              />
+
+              <PropertyMapCard
+                latitude={property.latitude}
+                locationLabel={property.locationText}
+                longitude={property.longitude}
+                title={property.title}
+              />
+
+              <Text style={styles.sectionTitle}>Amenities</Text>
+              {amenities.length > 0 ? (
+                amenities.map(item => (
+                  <Text key={item} style={styles.sectionText}>
+                    {`- ${item}`}
+                  </Text>
+                ))
+              ) : (
+                <Text style={styles.sectionText}>No amenities listed yet.</Text>
+              )}
 
               <View style={styles.statsRow}>
-                <StatColumn label="PRICE" suffix="/person" value="$350" />
-                <StatColumn label="RATING" suffix="/10" value="8.9" />
-                <StatColumn label="DURATION" suffix="hours" value="24" />
+                <StatColumn label="BEDROOMS" value={String(property.bedrooms)} />
+                <StatColumn label="BATHROOMS" value={String(property.bathrooms)} />
+                <StatColumn label="TYPE" value={property.propertyType} />
+              </View>
+
+              <View style={styles.listingTag}>
+                <Text style={styles.listingTagText}>{property.listingType}</Text>
               </View>
 
               <Pressable
@@ -116,20 +161,20 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
   );
 };
 
-type StatColumnProps = {
-  label: string;
-  suffix: string;
-  value: string;
-};
-
-const StatColumn: React.FC<StatColumnProps> = ({label, suffix, value}) => {
+const StatColumn: React.FC<StatColumnProps> = ({label, value}) => {
   return (
     <View style={styles.statColumn}>
       <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>
-        {value}
-        <Text style={styles.statSuffix}>{suffix}</Text>
-      </Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+};
+
+const InfoRow: React.FC<StatColumnProps> = ({label, value}) => {
+  return (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
     </View>
   );
 };
@@ -204,11 +249,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl + 6,
     paddingBottom: spacing.xl,
-    shadowColor: colors.shadow,
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    shadowOffset: {width: 0, height: -2},
-    elevation: 6,
   },
   favoriteWrap: {
     position: 'absolute',
@@ -237,15 +277,30 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     lineHeight: 22,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
-  includeTitle: {
+  infoRow: {
+    marginBottom: spacing.sm,
+  },
+  infoLabel: {
+    color: '#B0B0B0',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  infoValue: {
+    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  sectionTitle: {
     color: '#B0B0B0',
     fontFamily: fonts.medium,
     fontSize: 14,
     marginBottom: spacing.xs,
   },
-  includeText: {
+  sectionText: {
     color: '#C3C3C3',
     fontFamily: fonts.regular,
     fontSize: 14,
@@ -255,7 +310,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: spacing.xl + 4,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     gap: spacing.md,
   },
   statColumn: {
@@ -272,9 +327,18 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 18,
   },
-  statSuffix: {
-    fontFamily: fonts.regular,
-    fontSize: 12,
+  listingTag: {
+    minHeight: 44,
+    borderRadius: 10,
+    backgroundColor: '#FFF4E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  listingTagText: {
+    color: colors.accent,
+    fontFamily: fonts.semibold,
+    fontSize: 14,
   },
   bookButton: {
     minHeight: 54,

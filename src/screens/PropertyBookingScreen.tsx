@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -6,34 +6,58 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
-import VoucherArrowIcon from '../assets/images/Arrow.svg';
 import DateIcon from '../assets/images/clarity_date-line.svg';
-import DiscountIcon from '../assets/images/discount.svg';
 import DecreaseGuestIcon from '../assets/images/Frame 262.svg';
 import IncreaseGuestIcon from '../assets/images/Frame 263.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useResponsive} from '../hooks/useResponsive';
-import {colors, fonts, radii, spacing} from '../theme';
+import {PropertyRecord} from '../services/properties';
+import {PropertyBookingDraft} from '../types/propertyBooking';
+import {colors, fonts, spacing} from '../theme';
+import {
+  formatPropertyAvailability,
+  formatPropertyRent,
+} from '../utils/propertyPresentation';
 
 type PropertyBookingScreenProps = {
   activeTab: AppTab;
+  bookingDraft: PropertyBookingDraft;
   onBack: () => void;
   onNext: () => void;
   onTabPress: (tab: AppTab) => void;
+  onUpdateBookingDraft: (
+    updates: Partial<PropertyBookingDraft>,
+  ) => void;
+  property: PropertyRecord;
+};
+
+type DateInputProps = {
+  label: string;
+  onChangeText: (value: string) => void;
+  placeholder: string;
+  value: string;
+};
+
+type SummaryRowProps = {
+  label: string;
+  value: string;
 };
 
 export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   activeTab,
+  bookingDraft,
   onBack,
   onNext,
   onTabPress,
+  onUpdateBookingDraft,
+  property,
 }) => {
   const responsive = useResponsive();
-  const [guestCount, setGuestCount] = useState(4);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -69,24 +93,34 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
               </View>
 
               <View style={styles.summaryBody}>
-                <Text style={styles.summaryTitle}>Colombo Lux House</Text>
+                <Text style={styles.summaryTitle}>{property.title}</Text>
                 <Text style={styles.summaryAddress}>
-                  Jl. Lorem Ipsum Dolor Sit Amet Bandung
+                  {property.locationText || 'Location unavailable'}
                 </Text>
-                <Text style={styles.summaryAddress}>No. 123</Text>
+                <Text style={styles.summaryAddress}>{property.propertyCode}</Text>
               </View>
             </View>
 
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Non-refundable</Text>
+              <Text style={styles.noticeTitle}>Booking request</Text>
               <Text style={styles.noticeText}>
-                You can not refund your payment when you cancel.
+                Add your preferred stay dates and guest count before you continue.
               </Text>
             </View>
 
             <View style={styles.dateRow}>
-              <DateInput label="Check-in" value="DD/MM/YY" />
-              <DateInput label="Check-out" value="DD/MM/YY" />
+              <DateInput
+                label="Check-in"
+                onChangeText={value => onUpdateBookingDraft({checkIn: value})}
+                placeholder="DD/MM/YY"
+                value={bookingDraft.checkIn}
+              />
+              <DateInput
+                label="Check-out"
+                onChangeText={value => onUpdateBookingDraft({checkOut: value})}
+                placeholder="DD/MM/YY"
+                value={bookingDraft.checkOut}
+              />
             </View>
 
             <View style={styles.guestsRow}>
@@ -95,40 +129,61 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
               <View style={styles.stepperRow}>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setGuestCount(count => Math.max(1, count - 1))}
+                  onPress={() =>
+                    onUpdateBookingDraft({
+                      guestCount: Math.max(1, bookingDraft.guestCount - 1),
+                    })
+                  }
                   style={styles.stepperButton}>
                   <DecreaseGuestIcon height={24} width={24} />
                 </Pressable>
 
-                <Text style={styles.guestCountText}>{guestCount}</Text>
+                <Text style={styles.guestCountText}>
+                  {bookingDraft.guestCount}
+                </Text>
 
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setGuestCount(count => count + 1)}
+                  onPress={() =>
+                    onUpdateBookingDraft({
+                      guestCount: bookingDraft.guestCount + 1,
+                    })
+                  }
                   style={styles.stepperButton}>
                   <IncreaseGuestIcon height={24} width={24} />
                 </Pressable>
               </View>
             </View>
 
-            <Pressable accessibilityRole="button" style={styles.voucherCard}>
-              <View style={styles.voucherContent}>
-                <DiscountIcon height={18} width={18} />
-                <Text style={styles.voucherText}>3 vouchers are applied</Text>
-              </View>
-
-              <VoucherArrowIcon height={14} width={14} />
-            </Pressable>
-
-            <View style={styles.paymentCard}>
-              <Text style={styles.paymentTitle}>Payment Summary</Text>
-
-              <SummaryRow label="Subtotal" value="LKR 501500" />
-              <SummaryRow label="Discount Total" value="- LKR 1500" />
+            <View style={styles.summaryPanel}>
+              <Text style={styles.summaryPanelTitle}>Property Summary</Text>
+              <SummaryRow label="Listing Type" value={property.listingType} />
               <SummaryRow
-                highlight
-                label="Total Payment"
-                value="LKR 500000"
+                label="Bedrooms"
+                value={String(property.bedrooms)}
+              />
+              <SummaryRow
+                label="Bathrooms"
+                value={String(property.bathrooms)}
+              />
+              <SummaryRow
+                label="Amenities"
+                value={
+                  property.amenities.length > 0
+                    ? property.amenities.slice(0, 3).join(', ')
+                    : 'None listed'
+                }
+              />
+              <SummaryRow
+                label="Monthly Rent"
+                value={formatPropertyRent(property.monthlyRent)}
+              />
+              <SummaryRow
+                label="Available"
+                value={formatPropertyAvailability(
+                  property.availableFrom,
+                  property.availableTo,
+                )}
               />
             </View>
 
@@ -147,38 +202,34 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   );
 };
 
-type DateInputProps = {
-  label: string;
-  value: string;
-};
-
-const DateInput: React.FC<DateInputProps> = ({label, value}) => {
+const DateInput: React.FC<DateInputProps> = ({
+  label,
+  onChangeText,
+  placeholder,
+  value,
+}) => {
   return (
     <View style={styles.dateInputWrap}>
       <Text style={styles.dateInputLabel}>{label}</Text>
-      <Pressable accessibilityRole="button" style={styles.dateInput}>
-        <Text style={styles.dateInputText}>{value}</Text>
+      <View style={styles.dateInput}>
+        <TextInput
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor="#B2B2B2"
+          style={styles.dateInputText}
+          value={value}
+        />
         <DateIcon height={18} width={18} />
-      </Pressable>
+      </View>
     </View>
   );
 };
 
-type SummaryRowProps = {
-  highlight?: boolean;
-  label: string;
-  value: string;
-};
-
-const SummaryRow: React.FC<SummaryRowProps> = ({highlight, label, value}) => {
+const SummaryRow: React.FC<SummaryRowProps> = ({label, value}) => {
   return (
     <View style={styles.summaryRow}>
-      <Text style={[styles.summaryRowLabel, highlight ? styles.summaryRowLabelStrong : null]}>
-        {label}
-      </Text>
-      <Text style={[styles.summaryRowValue, highlight ? styles.summaryRowValueHighlight : null]}>
-        {value}
-      </Text>
+      <Text style={styles.summaryRowLabel}>{label}</Text>
+      <Text style={styles.summaryRowValue}>{value}</Text>
     </View>
   );
 };
@@ -300,7 +351,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   dateInput: {
-    minHeight: 38,
+    minHeight: 42,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#9F9F9F',
@@ -309,11 +360,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm + 4,
+    gap: spacing.xs,
   },
   dateInputText: {
-    color: '#B2B2B2',
+    flex: 1,
+    color: colors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 16,
+    paddingVertical: 0,
   },
   guestsRow: {
     flexDirection: 'row',
@@ -344,29 +398,7 @@ const styles = StyleSheet.create({
     minWidth: 16,
     textAlign: 'center',
   },
-  voucherCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.accent,
-    backgroundColor: '#FFFDF8',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg + 4,
-  },
-  voucherContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  voucherText: {
-    color: colors.accent,
-    fontFamily: fonts.medium,
-    fontSize: 14,
-  },
-  paymentCard: {
+  summaryPanel: {
     backgroundColor: colors.white,
     borderRadius: 18,
     paddingHorizontal: spacing.md,
@@ -378,7 +410,7 @@ const styles = StyleSheet.create({
     elevation: 6,
     marginBottom: spacing.xl,
   },
-  paymentTitle: {
+  summaryPanelTitle: {
     color: colors.textPrimary,
     fontFamily: fonts.bold,
     fontSize: 18,
@@ -389,23 +421,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   summaryRowLabel: {
     color: colors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 15,
   },
-  summaryRowLabelStrong: {
-    fontFamily: fonts.bold,
-  },
   summaryRowValue: {
     color: '#969696',
     fontFamily: fonts.regular,
     fontSize: 15,
-  },
-  summaryRowValueHighlight: {
-    color: colors.accent,
-    fontFamily: fonts.medium,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   nextButton: {
     minHeight: 54,

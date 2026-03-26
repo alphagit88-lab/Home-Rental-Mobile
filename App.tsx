@@ -12,6 +12,7 @@ import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
 import {OwnerPropertyDetailsScreen} from './src/screens/OwnerPropertyDetailsScreen';
 import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
+import {PropertyRecord} from './src/services/properties';
 import {SignUpScreen} from './src/screens/SignUpScreen';
 import {DashboardVariant} from './src/types/appFlow';
 import {clearAuthSession} from './src/services/authSession';
@@ -25,8 +26,8 @@ const App: React.FC = () => {
   const [ownerPropertiesView, setOwnerPropertiesView] = useState<
     'list' | 'create' | 'detail' | 'edit'
   >('list');
-  const [selectedOwnerPropertyTitle, setSelectedOwnerPropertyTitle] =
-    useState('Colombo Lux House');
+  const [selectedOwnerProperty, setSelectedOwnerProperty] =
+    useState<PropertyRecord | null>(null);
 
   const handleTabPress = (tab: AppTab) => {
     if (tab !== 'properties') {
@@ -48,33 +49,38 @@ const App: React.FC = () => {
             <OwnerAddPropertyScreen
               activeTab={activeTab}
               onBackPress={() => setOwnerPropertiesView('list')}
-              onSubmitPress={() => setOwnerPropertiesView('list')}
+              onPropertySaved={() => setOwnerPropertiesView('list')}
               onTabPress={handleTabPress}
             />
           );
         }
 
-        if (ownerPropertiesView === 'edit') {
+        if (ownerPropertiesView === 'edit' && selectedOwnerProperty) {
           return (
             <OwnerAddPropertyScreen
               activeTab={activeTab}
               headerTitle="Edit Property"
+              mode="edit"
               onBackPress={() => setOwnerPropertiesView('detail')}
-              onSubmitPress={() => setOwnerPropertiesView('detail')}
+              onPropertySaved={property => {
+                setSelectedOwnerProperty(property);
+                setOwnerPropertiesView('detail');
+              }}
               onTabPress={handleTabPress}
+              property={selectedOwnerProperty}
               submitLabel="SAVE PROPERTY"
             />
           );
         }
 
-        if (ownerPropertiesView === 'detail') {
+        if (ownerPropertiesView === 'detail' && selectedOwnerProperty) {
           return (
             <OwnerPropertyDetailsScreen
               activeTab={activeTab}
               onBackPress={() => setOwnerPropertiesView('list')}
               onEditPropertyPress={() => setOwnerPropertiesView('edit')}
+              property={selectedOwnerProperty}
               onTabPress={handleTabPress}
-              propertyTitle={selectedOwnerPropertyTitle}
             />
           );
         }
@@ -83,8 +89,8 @@ const App: React.FC = () => {
           <OwnerPropertiesScreen
             activeTab={activeTab}
             onAddNewPropertyPress={() => setOwnerPropertiesView('create')}
-            onViewPropertyPress={title => {
-              setSelectedOwnerPropertyTitle(title);
+            onViewPropertyPress={property => {
+              setSelectedOwnerProperty(property);
               setOwnerPropertiesView('detail');
             }}
             onTabPress={handleTabPress}

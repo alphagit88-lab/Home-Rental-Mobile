@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {useOwnerProperties} from '../hooks/useOwnerProperties';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 import MenuIcon from '../assets/images/menu 1.svg';
@@ -30,31 +31,7 @@ type DashboardItem = {
   title: string;
 };
 
-const recentBookings: DashboardItem[] = [
-  {
-    id: 'recent-booking-1',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-  {
-    id: 'recent-booking-2',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-];
-
-const properties: DashboardItem[] = [
-  {
-    id: 'property-1',
-    title: 'Colombo Lux House',
-    subtitle: '#PRO001',
-  },
-  {
-    id: 'property-2',
-    title: 'Colombo Cozy House',
-    subtitle: '#PRO002',
-  },
-];
+const recentBookings: DashboardItem[] = [];
 
 export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
   activeTab,
@@ -64,6 +41,18 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const {
+    errorMessage: propertyErrorMessage,
+    loading: propertiesLoading,
+    properties,
+  } = useOwnerProperties();
+  const propertyItems: DashboardItem[] = properties
+    .slice(0, 3)
+    .map(property => ({
+      id: `property-${property.id}`,
+      title: property.title,
+      subtitle: property.propertyCode,
+    }));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -147,6 +136,7 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
             </View>
 
             <DashboardSection
+              emptyMessage="Recent bookings will appear here when booking data is available."
               footerLabel="Bookings"
               items={recentBookings}
               onItemPress={() => onTabPress('bookings')}
@@ -155,8 +145,12 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
             />
 
             <DashboardSection
+              emptyMessage={
+                propertyErrorMessage ?? 'You have not added any properties yet.'
+              }
               footerLabel="Properties"
-              items={properties}
+              items={propertyItems}
+              loading={propertiesLoading}
               onItemPress={() => onTabPress('properties')}
               onViewAllPress={() => onTabPress('properties')}
               title="My Properties"
@@ -171,16 +165,20 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
 };
 
 type DashboardSectionProps = {
+  emptyMessage?: string;
   footerLabel: string;
   items: DashboardItem[];
+  loading?: boolean;
   onItemPress: () => void;
   onViewAllPress: () => void;
   title: string;
 };
 
 const DashboardSection: React.FC<DashboardSectionProps> = ({
+  emptyMessage,
   footerLabel,
   items,
+  loading = false,
   onItemPress,
   onViewAllPress,
   title,
@@ -207,14 +205,24 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
       </View>
 
       <View style={styles.sectionItems}>
-        {items.map(item => (
-          <DashboardListItem
-            key={item.id}
-            onPress={onItemPress}
-            subtitle={item.subtitle}
-            title={item.title}
-          />
-        ))}
+        {loading ? (
+          <Text style={styles.sectionStateText}>
+            Loading your {footerLabel.toLowerCase()}...
+          </Text>
+        ) : items.length === 0 ? (
+          <Text style={styles.sectionStateText}>
+            {emptyMessage ?? `No ${footerLabel.toLowerCase()} yet.`}
+          </Text>
+        ) : (
+          items.map(item => (
+            <DashboardListItem
+              key={item.id}
+              onPress={onItemPress}
+              subtitle={item.subtitle}
+              title={item.title}
+            />
+          ))
+        )}
       </View>
 
       <Pressable
@@ -421,6 +429,12 @@ const styles = StyleSheet.create({
   },
   sectionItems: {
     gap: spacing.sm,
+  },
+  sectionStateText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
   },
   listItem: {
     backgroundColor: colors.primary,
