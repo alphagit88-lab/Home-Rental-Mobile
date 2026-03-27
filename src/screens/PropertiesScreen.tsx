@@ -22,6 +22,8 @@ import RefreshIcon from '../assets/images/refreshing 1.svg';
 import BedIcon from '../assets/images/fluent_bed-24-filled.svg';
 import BathIcon from '../assets/images/fa-solid_bath.svg';
 import WifiIcon from '../assets/images/eva_wifi-fill.svg';
+import ParkingIcon from '../assets/images/parking-svgrepo-com.svg';
+import PoolIcon from '../assets/images/swimming-pool-svgrepo-com.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
@@ -30,7 +32,12 @@ import {useResponsive} from '../hooks/useResponsive';
 import {PropertyRecord} from '../services/properties';
 import {PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, radii, spacing} from '../theme';
-import {formatShortDateInput} from '../utils/dateInput';
+import {formatShortDateInput, normalizeDateString} from '../utils/dateInput';
+import {
+  AmenityOptionKey,
+  getAmenityOptionKeys,
+  getAmenityOptionLabel,
+} from '../utils/propertyAmenities';
 import {
   formatPropertyAvailabilityChip,
   formatPropertyRentCompact,
@@ -46,11 +53,44 @@ type PropertiesScreenProps = {
 
 type SortOption = 'Newest' | 'A-Z' | 'Bedrooms' | 'Bathrooms';
 
+type BookingDateField = 'checkIn' | 'checkOut';
+
+type DateInputProps = {
+  label: string;
+  onPress: () => void;
+  value: string;
+};
+
+type CalendarPickerModalProps = {
+  minimumValue?: string | null;
+  onClear: () => void;
+  onClose: () => void;
+  onConfirm: (value: string) => void;
+  title: string;
+  value: string;
+  visible: boolean;
+};
+
 const sortByOptions: SortOption[] = ['Newest', 'A-Z', 'Bedrooms', 'Bathrooms'];
 const propertyTypeDefaults = ['Apartment', 'House', 'Room / Boarding'];
 const listingTypeDefaults = ['For Rent', 'Short-term'];
 const SLIDER_THUMB_SIZE = 18;
 const SLIDER_TOUCH_SIZE = 32;
+const monthLabels = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const createBookingDraft = (): PropertyBookingDraft => ({
   checkIn: '',
@@ -60,6 +100,89 @@ const createBookingDraft = (): PropertyBookingDraft => ({
 
 const uniqueValues = (values: string[]) =>
   Array.from(new Set(values.filter(value => value.trim().length > 0)));
+
+const formatCalendarDate = (
+  year: number,
+  monthIndex: number,
+  day: number,
+) =>
+  `${String(year).padStart(4, '0')}-${String(monthIndex + 1).padStart(
+    2,
+    '0',
+  )}-${String(day).padStart(2, '0')}`;
+
+const parseStoredDate = (value: string) => {
+  const normalizedValue = normalizeDateString(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const [yearString, monthString, dayString] = normalizedValue.split('-');
+
+  return {
+    day: Number(dayString),
+    monthIndex: Number(monthString) - 1,
+    year: Number(yearString),
+  };
+};
+
+const getDaysInMonth = (year: number, monthIndex: number) =>
+  new Date(year, monthIndex + 1, 0).getDate();
+
+const buildCalendarGrid = (year: number, monthIndex: number) => {
+  const firstWeekday = new Date(year, monthIndex, 1).getDay();
+  const totalDays = getDaysInMonth(year, monthIndex);
+  const leadingSlots = Array.from({length: firstWeekday}, () => null);
+  const daySlots = Array.from({length: totalDays}, (_, index) => index + 1);
+  const trailingCount =
+    (7 - ((leadingSlots.length + daySlots.length) % 7)) % 7;
+  const trailingSlots = Array.from({length: trailingCount}, () => null);
+
+  return [...leadingSlots, ...daySlots, ...trailingSlots];
+};
+
+const getTodayIsoDate = () => {
+  const currentDate = new Date();
+
+  return formatCalendarDate(
+    currentDate.getFullYear(),
+    currentDate.getMonth(),
+    currentDate.getDate(),
+  );
+};
+
+const getLaterIsoDate = (firstValue: string, secondValue: string) =>
+  firstValue >= secondValue ? firstValue : secondValue;
+
+const getInitialCalendarState = (
+  value: string,
+  minimumValue?: string | null,
+) => {
+  const normalizedMinimumValue =
+    minimumValue && normalizeDateString(minimumValue)
+      ? normalizeDateString(minimumValue)
+      : null;
+  const normalizedValue = normalizeDateString(value);
+  const parsedDate =
+    normalizedValue &&
+    (!normalizedMinimumValue || normalizedValue >= normalizedMinimumValue)
+      ? parseStoredDate(normalizedValue)
+      : null;
+  const fallbackDate = normalizedMinimumValue
+    ? parseStoredDate(normalizedMinimumValue)
+    : null;
+  const currentDate = new Date();
+
+  return {
+    monthIndex:
+      parsedDate?.monthIndex ??
+      fallbackDate?.monthIndex ??
+      currentDate.getMonth(),
+    selectedValue: parsedDate ? normalizedValue ?? '' : '',
+    year: parsedDate?.year ?? fallbackDate?.year ?? currentDate.getFullYear(),
+  };
+};
 
 const toggleValue = (values: string[], value: string) =>
   values.includes(value)
@@ -124,13 +247,6 @@ const getMetaText = (property: PropertyRecord) =>
     .filter(Boolean)
     .join(' | ');
 
-const getAmenityLabel = (property: PropertyRecord) =>
-  property.amenities.find(amenity => /wi[\s-]?fi|internet/i.test(amenity)) ??
-  property.amenities[0] ??
-  'Details';
-
-const shouldUseWifiIcon = (label: string) => /wi[\s-]?fi|internet/i.test(label);
-
 const getFooterDetails = (property: PropertyRecord) =>
   property.monthlyRent === null
     ? {label: 'code', value: property.propertyCode}
@@ -142,6 +258,18 @@ const getAvailabilityTagLabel = (property: PropertyRecord) =>
     property.availableTo,
     property.listingType,
   );
+
+const getAmenityIcon = (key: AmenityOptionKey) => {
+  if (key === 'parking') {
+    return <ParkingIcon height={15} width={15} />;
+  }
+
+  if (key === 'pool') {
+    return <PoolIcon height={15} width={15} />;
+  }
+
+  return <WifiIcon height={15} width={15} />;
+};
 
 export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   activeTab,
@@ -161,6 +289,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const [bookingDraft, setBookingDraft] = useState<PropertyBookingDraft>(
     createBookingDraft(),
   );
+  const [activeBookingDateField, setActiveBookingDateField] =
+    useState<BookingDateField | null>(null);
   const [searchText, setSearchText] = useState('');
   const [selectedSortBy, setSelectedSortBy] = useState<SortOption>('Newest');
   const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>(
@@ -180,6 +310,11 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   );
   const [bedroomRange, setBedroomRange] = useState<[number, number]>([1, 1]);
   const [bathroomRange, setBathroomRange] = useState<[number, number]>([1, 1]);
+  const todayIsoDate = getTodayIsoDate();
+  const normalizedCheckInDate = normalizeDateString(bookingDraft.checkIn) ?? '';
+  const minimumCheckOutDate = normalizedCheckInDate
+    ? getLaterIsoDate(todayIsoDate, normalizedCheckInDate)
+    : todayIsoDate;
 
   useEffect(() => {
     setBedroomRange([1, maximumBedrooms]);
@@ -284,6 +419,54 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     setBathroomRange([1, maximumBathrooms]);
   };
 
+  const openBookingDatePicker = (field: BookingDateField) => {
+    setActiveBookingDateField(field);
+  };
+
+  const closeBookingDatePicker = () => {
+    setActiveBookingDateField(null);
+  };
+
+  const handleBookingDateConfirm = (value: string) => {
+    const formattedValue = formatShortDateInput(value);
+
+    if (activeBookingDateField === 'checkIn') {
+      setBookingDraft(current => {
+        const normalizedCurrentCheckOut = normalizeDateString(current.checkOut);
+
+        return {
+          ...current,
+          checkIn: formattedValue,
+          checkOut:
+            normalizedCurrentCheckOut && normalizedCurrentCheckOut < value
+              ? formattedValue
+              : current.checkOut,
+        };
+      });
+    }
+
+    if (activeBookingDateField === 'checkOut') {
+      setBookingDraft(current => ({
+        ...current,
+        checkOut: formattedValue,
+      }));
+    }
+
+    closeBookingDatePicker();
+  };
+
+  const handleBookingDateClear = () => {
+    if (activeBookingDateField === 'checkIn') {
+      setBookingDraft(current => ({...current, checkIn: '', checkOut: ''}));
+    }
+
+    if (activeBookingDateField === 'checkOut') {
+      setBookingDraft(current => ({...current, checkOut: ''}));
+    }
+
+    closeBookingDatePicker();
+  };
+
   const openPropertyDetails = (property: PropertyRecord) => {
     setSelectedProperty(property);
     setDetailVisible(true);
@@ -379,22 +562,12 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             <View style={styles.dateRow}>
               <DateInput
                 label="Move-in"
-                onChangeText={value =>
-                  setBookingDraft(current => ({
-                    ...current,
-                    checkIn: formatShortDateInput(value),
-                  }))
-                }
+                onPress={() => openBookingDatePicker('checkIn')}
                 value={bookingDraft.checkIn}
               />
               <DateInput
                 label="Move-out"
-                onChangeText={value =>
-                  setBookingDraft(current => ({
-                    ...current,
-                    checkOut: formatShortDateInput(value),
-                  }))
-                }
+                onPress={() => openBookingDatePicker('checkOut')}
                 value={bookingDraft.checkOut}
               />
             </View>
@@ -434,6 +607,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                     <PropertyCard
                       baths={`${property.bathrooms} bath`}
                       bedrooms={`${property.bedrooms} bedroom`}
+                      facilityKeys={getAmenityOptionKeys(property.amenities)}
                       footerLabel={footerDetails.label}
                       footerValue={footerDetails.value}
                       key={property.id}
@@ -441,7 +615,6 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                       onAvailabilityPress={() => openPropertyDetails(property)}
                       tag={getAvailabilityTagLabel(property)}
                       title={property.title}
-                      highlightLabel={getAmenityLabel(property)}
                     />
                   );
                 })}
@@ -624,6 +797,28 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           </SafeAreaView>
         </Modal>
 
+        <CalendarPickerModal
+          minimumValue={
+            activeBookingDateField === 'checkOut'
+              ? minimumCheckOutDate
+              : todayIsoDate
+          }
+          onClear={handleBookingDateClear}
+          onClose={closeBookingDatePicker}
+          onConfirm={handleBookingDateConfirm}
+          title={
+            activeBookingDateField === 'checkOut'
+              ? 'Select move-out'
+              : 'Select move-in'
+          }
+          value={
+            activeBookingDateField === 'checkOut'
+              ? bookingDraft.checkOut
+              : bookingDraft.checkIn
+          }
+          visible={Boolean(activeBookingDateField)}
+        />
+
         <AppBottomNav activeTab={activeTab} onTabPress={onTabPress} />
       </View>
     </SafeAreaView>
@@ -686,38 +881,213 @@ const LocationSearchField: React.FC<LocationSearchFieldProps> = ({
   );
 };
 
-type DateInputProps = {
-  label: string;
-  onChangeText: (value: string) => void;
-  value: string;
-};
-
-const DateInput: React.FC<DateInputProps> = ({label, onChangeText, value}) => {
+const DateInput: React.FC<DateInputProps> = ({label, onPress, value}) => {
   return (
     <View style={styles.dateInputWrap}>
       <Text style={styles.dateInputLabel}>{label}</Text>
-      <View style={styles.dateInput}>
-        <TextInput
-          keyboardType="number-pad"
-          maxLength={8}
-          onChangeText={onChangeText}
-          placeholder="DD/MM/YY"
-          placeholderTextColor="#B1B1B1"
-          style={styles.dateInputText}
-          value={value}
-        />
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({pressed}) => [
+          styles.dateInput,
+          pressed ? styles.filterChipPressed : null,
+        ]}>
+        <Text
+          style={[
+            styles.dateInputText,
+            value.trim().length === 0 ? styles.dateInputPlaceholderText : null,
+          ]}>
+          {value.trim().length > 0 ? value : 'DD/MM/YY'}
+        </Text>
         <DateIcon height={18} width={18} />
-      </View>
+      </Pressable>
     </View>
+  );
+};
+
+const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
+  minimumValue,
+  onClear,
+  onClose,
+  onConfirm,
+  title,
+  value,
+  visible,
+}) => {
+  const initialCalendarState = getInitialCalendarState(value, minimumValue);
+  const [displayYear, setDisplayYear] = useState(initialCalendarState.year);
+  const [displayMonth, setDisplayMonth] = useState(initialCalendarState.monthIndex);
+  const [selectedValue, setSelectedValue] = useState(
+    initialCalendarState.selectedValue,
+  );
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const nextCalendarState = getInitialCalendarState(value, minimumValue);
+    setDisplayYear(nextCalendarState.year);
+    setDisplayMonth(nextCalendarState.monthIndex);
+    setSelectedValue(nextCalendarState.selectedValue);
+  }, [minimumValue, value, visible]);
+
+  const selectedParts = parseStoredDate(selectedValue);
+  const calendarDays = buildCalendarGrid(displayYear, displayMonth);
+
+  return (
+    <Modal
+      animationType="fade"
+      onRequestClose={onClose}
+      transparent
+      visible={visible}>
+      <View style={styles.calendarOverlay}>
+        <View style={styles.calendarCard}>
+          <Text style={styles.calendarTitle}>{title}</Text>
+
+          <View style={styles.calendarYearRow}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDisplayYear(current => current - 1)}
+              style={({pressed}) => [
+                styles.calendarYearButton,
+                pressed ? styles.filterChipPressed : null,
+              ]}>
+              <Text style={styles.calendarYearButtonText}>-</Text>
+            </Pressable>
+            <Text style={styles.calendarYearText}>{String(displayYear)}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setDisplayYear(current => current + 1)}
+              style={({pressed}) => [
+                styles.calendarYearButton,
+                pressed ? styles.filterChipPressed : null,
+              ]}>
+              <Text style={styles.calendarYearButtonText}>+</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.calendarMonthGrid}>
+            {monthLabels.map((monthLabel, index) => (
+              <Pressable
+                accessibilityRole="button"
+                key={monthLabel}
+                onPress={() => setDisplayMonth(index)}
+                style={({pressed}) => [
+                  styles.calendarMonthChip,
+                  displayMonth === index ? styles.calendarMonthChipActive : null,
+                  pressed ? styles.filterChipPressed : null,
+                ]}>
+                <Text
+                  style={[
+                    styles.calendarMonthChipText,
+                    displayMonth === index
+                      ? styles.calendarMonthChipTextActive
+                      : null,
+                  ]}>
+                  {monthLabel}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.weekdayRow}>
+            {weekdayLabels.map(day => (
+              <Text key={day} style={styles.weekdayLabel}>
+                {day}
+              </Text>
+            ))}
+          </View>
+
+          <View style={styles.calendarDayGrid}>
+            {calendarDays.map((day, index) => {
+              if (day === null) {
+                return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+              }
+
+              const dayValue = formatCalendarDate(displayYear, displayMonth, day);
+              const isDisabled = Boolean(
+                minimumValue && dayValue < minimumValue,
+              );
+              const isSelected =
+                selectedParts?.year === displayYear &&
+                selectedParts?.monthIndex === displayMonth &&
+                selectedParts?.day === day;
+
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={isDisabled}
+                  key={`${displayYear}-${displayMonth}-${day}`}
+                  onPress={() => setSelectedValue(dayValue)}
+                  style={({pressed}) => [
+                    styles.calendarDayCell,
+                    styles.calendarDayButton,
+                    isSelected ? styles.calendarDayButtonActive : null,
+                    isDisabled ? styles.calendarDayButtonDisabled : null,
+                    pressed ? styles.filterChipPressed : null,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.calendarDayText,
+                      isSelected ? styles.calendarDayTextActive : null,
+                      isDisabled ? styles.calendarDayTextDisabled : null,
+                    ]}>
+                    {String(day)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={styles.calendarSelectedText}>
+            {selectedValue ? formatShortDateInput(selectedValue) : 'No date selected'}
+          </Text>
+
+          <View style={styles.calendarFooter}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClear}
+              style={({pressed}) => [
+                styles.calendarFooterButton,
+                styles.calendarFooterButtonSecondary,
+                pressed ? styles.filterChipPressed : null,
+              ]}>
+              <Text style={styles.calendarFooterButtonSecondaryText}>Clear</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClose}
+              style={({pressed}) => [
+                styles.calendarFooterButton,
+                styles.calendarFooterButtonSecondary,
+                pressed ? styles.filterChipPressed : null,
+              ]}>
+              <Text style={styles.calendarFooterButtonSecondaryText}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onConfirm(selectedValue)}
+              style={({pressed}) => [
+                styles.calendarFooterButton,
+                styles.calendarFooterButtonPrimary,
+                pressed ? styles.filterChipPressed : null,
+              ]}>
+              <Text style={styles.calendarFooterButtonPrimaryText}>Apply</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
   );
 };
 
 type PropertyCardProps = {
   baths: string;
   bedrooms: string;
+  facilityKeys: AmenityOptionKey[];
   footerLabel: string;
   footerValue: string;
-  highlightLabel: string;
   meta: string;
   onAvailabilityPress: () => void;
   tag: string;
@@ -727,9 +1097,9 @@ type PropertyCardProps = {
 const PropertyCard: React.FC<PropertyCardProps> = ({
   baths,
   bedrooms,
+  facilityKeys,
   footerLabel,
   footerValue,
-  highlightLabel,
   meta,
   onAvailabilityPress,
   tag,
@@ -752,14 +1122,13 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <View style={styles.amenitiesRow}>
           <Amenity icon={<BedIcon height={15} width={15} />} label={bedrooms} />
           <Amenity icon={<BathIcon height={15} width={15} />} label={baths} />
-          <Amenity
-            icon={
-              shouldUseWifiIcon(highlightLabel) ? (
-                <WifiIcon height={15} width={15} />
-              ) : null
-            }
-            label={highlightLabel}
-          />
+          {facilityKeys.map(key => (
+            <Amenity
+              icon={getAmenityIcon(key)}
+              key={key}
+              label={getAmenityOptionLabel(key)}
+            />
+          ))}
         </View>
 
         <Text numberOfLines={1} style={styles.propertyMeta}>
@@ -1090,6 +1459,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 0,
   },
+  dateInputPlaceholderText: {
+    color: '#B1B1B1',
+  },
   filterRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1251,6 +1623,165 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     backgroundColor: colors.white,
+  },
+  calendarOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(25, 21, 19, 0.34)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  calendarCard: {
+    width: '100%',
+    maxWidth: 360,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  calendarTitle: {
+    color: colors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    marginBottom: spacing.md,
+  },
+  calendarYearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  calendarYearButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDD6CF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAF7F3',
+  },
+  calendarYearButtonText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.semibold,
+    fontSize: 18,
+    lineHeight: 20,
+  },
+  calendarYearText: {
+    minWidth: 72,
+    textAlign: 'center',
+    color: colors.textPrimary,
+    fontFamily: fonts.semibold,
+    fontSize: 16,
+  },
+  calendarMonthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  calendarMonthChip: {
+    minWidth: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#DDD6CF',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  calendarMonthChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#EEF6F2',
+  },
+  calendarMonthChipText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+  },
+  calendarMonthChipTextActive: {
+    color: colors.primary,
+    fontFamily: fonts.medium,
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    marginBottom: spacing.xs,
+  },
+  weekdayLabel: {
+    width: `${100 / 7}%`,
+    textAlign: 'center',
+    color: '#7B756E',
+    fontFamily: fonts.medium,
+    fontSize: 12,
+  },
+  calendarDayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.sm,
+  },
+  calendarDayCell: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDayButton: {
+    borderRadius: 12,
+  },
+  calendarDayButtonActive: {
+    backgroundColor: colors.primary,
+  },
+  calendarDayButtonDisabled: {
+    backgroundColor: '#F5F1EB',
+  },
+  calendarDayText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+  },
+  calendarDayTextActive: {
+    color: colors.white,
+    fontFamily: fonts.semibold,
+  },
+  calendarDayTextDisabled: {
+    color: '#B9B1A8',
+  },
+  calendarSelectedText: {
+    color: '#6F675F',
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginBottom: spacing.md,
+  },
+  calendarFooter: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  calendarFooterButton: {
+    flex: 1,
+    minHeight: 42,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarFooterButtonSecondary: {
+    borderWidth: 1,
+    borderColor: '#DDD6CF',
+    backgroundColor: '#FAF7F3',
+  },
+  calendarFooterButtonPrimary: {
+    backgroundColor: colors.primary,
+  },
+  calendarFooterButtonSecondaryText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+  },
+  calendarFooterButtonPrimaryText: {
+    color: colors.white,
+    fontFamily: fonts.semibold,
+    fontSize: 13,
   },
   applyButton: {
     minHeight: 54,
