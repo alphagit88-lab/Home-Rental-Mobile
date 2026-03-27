@@ -111,7 +111,9 @@ export const useLoginScreen = () => {
         return;
       }
 
-      setAuthSession(session);
+      await setAuthSession(session, {
+        persist: rememberMe,
+      });
       setSubmitState('idle');
       setInlineMessage({
         text: `Welcome back, ${session.user.name}.`,

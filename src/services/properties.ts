@@ -382,7 +382,7 @@ const resolveSaveCoordinates = async (params: SavePropertyParams) => {
 
   if (!geocodedCoordinates) {
     throw new Error(
-      'Unable to find the exact property location. Add a more specific address or enter latitude and longitude.',
+      'Unable to find the exact property location. Add a more specific address or choose the location from the map.',
     );
   }
 

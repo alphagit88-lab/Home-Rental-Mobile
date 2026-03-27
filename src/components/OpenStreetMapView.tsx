@@ -6,7 +6,12 @@ import React, {
 } from 'react';
 import {StyleSheet} from 'react-native';
 import {Region} from 'react-native-maps';
-import {WebView} from 'react-native-webview';
+import {WebView, WebViewMessageEvent} from 'react-native-webview';
+
+export type OpenStreetMapCoordinate = {
+  latitude: number;
+  longitude: number;
+};
 
 export type OpenStreetMapMarker = {
   description?: string;
@@ -25,8 +30,10 @@ export type OpenStreetMapViewHandle = {
 };
 
 type OpenStreetMapViewProps = {
+  initialSelectedCoordinate?: OpenStreetMapCoordinate | null;
   interactive?: boolean;
   markers: OpenStreetMapMarker[];
+  onMapPress?: (coordinate: OpenStreetMapCoordinate) => void;
   region: Region;
 };
 
@@ -49,11 +56,15 @@ const buildHtml = (
   markers: OpenStreetMapMarker[],
   region: Region,
   interactive: boolean,
+  initialSelectedCoordinate: OpenStreetMapCoordinate | null,
+  selectionEnabled: boolean,
 ) => {
   const payload = toJsonScriptValue({
+    initialSelectedCoordinate,
     interactive,
     markers,
     region,
+    selectionEnabled,
     zoom: getZoomLevel(region),
   });
 
@@ -92,9 +103,9 @@ const buildHtml = (
         background: #d7e6e8;
       }
 
-      .property-pin {
+      .property-pin,
+      .selection-pin {
         align-items: center;
-        background: #f0b53a;
         border: 2px solid #ffffff;
         border-radius: 18px;
         box-shadow: 0 4px 14px rgba(16, 12, 10, 0.24);
@@ -108,12 +119,17 @@ const buildHtml = (
         width: 36px;
       }
 
-      .property-pin.is-highlighted {
-        background: #3f7765;
-        transform: scale(1.06);
+      .property-pin {
+        background: #f0b53a;
       }
 
-      .property-pin::after {
+      .property-pin.is-highlighted,
+      .selection-pin {
+        background: #3f7765;
+      }
+
+      .property-pin::after,
+      .selection-pin::after {
         background: #ffffff;
         border-bottom-left-radius: 2px;
         border-bottom-right-radius: 2px;
@@ -124,6 +140,10 @@ const buildHtml = (
         position: absolute;
         transform: translateX(-50%);
         width: 4px;
+      }
+
+      .selection-pin {
+        transform: scale(1.06);
       }
 
       .property-tooltip {
@@ -237,6 +257,32 @@ const buildHtml = (
             : '') +
           '</div>';
 
+        let selectedMarker = null;
+        const selectionIcon = L.divIcon({
+          className: '',
+          html: '<div class="selection-pin">PIN</div>',
+          iconAnchor: [18, 46],
+          iconSize: [36, 46],
+        });
+
+        const updateSelectedMarker = (coordinate) => {
+          if (!coordinate) {
+            return;
+          }
+
+          const markerPosition = [coordinate.latitude, coordinate.longitude];
+
+          if (!selectedMarker) {
+            selectedMarker = L.marker(markerPosition, {
+              icon: selectionIcon,
+              riseOnHover: true,
+            }).addTo(map);
+            return;
+          }
+
+          selectedMarker.setLatLng(markerPosition);
+        };
+
         config.markers.forEach((marker) => {
           const markerIcon = L.divIcon({
             className: '',
@@ -272,6 +318,34 @@ const buildHtml = (
 
           bounds.push([marker.latitude, marker.longitude]);
         });
+
+        if (config.initialSelectedCoordinate) {
+          updateSelectedMarker(config.initialSelectedCoordinate);
+          bounds.push([
+            config.initialSelectedCoordinate.latitude,
+            config.initialSelectedCoordinate.longitude,
+          ]);
+        }
+
+        if (config.interactive && config.selectionEnabled) {
+          map.on('click', function (event) {
+            const coordinate = {
+              latitude: Number(event.latlng.lat.toFixed(6)),
+              longitude: Number(event.latlng.lng.toFixed(6)),
+            };
+
+            updateSelectedMarker(coordinate);
+
+            if (window.ReactNativeWebView) {
+              window.ReactNativeWebView.postMessage(
+                JSON.stringify({
+                  coordinate: coordinate,
+                  type: 'mapPress',
+                })
+              );
+            }
+          });
+        }
 
         const focusMarkers = (animated) => {
           if (bounds.length === 0) {
@@ -329,39 +403,89 @@ const runMapCommand = (
 export const OpenStreetMapView = forwardRef<
   OpenStreetMapViewHandle,
   OpenStreetMapViewProps
->(({interactive = true, markers, region}, ref) => {
-  const webViewRef = useRef<WebView | null>(null);
-  const sourceHtml = useMemo(
-    () => buildHtml(markers, region, interactive),
-    [interactive, markers, region],
-  );
-
-  useImperativeHandle(
+>(
+  (
+    {
+      initialSelectedCoordinate = null,
+      interactive = true,
+      markers,
+      onMapPress,
+      region,
+    },
     ref,
-    () => ({
-      fitToMarkers: () => runMapCommand(webViewRef.current, 'focusMarkers'),
-      zoomIn: () => runMapCommand(webViewRef.current, 'zoomIn'),
-      zoomOut: () => runMapCommand(webViewRef.current, 'zoomOut'),
-    }),
-    [],
-  );
+  ) => {
+    const webViewRef = useRef<WebView | null>(null);
+    const selectionEnabled = Boolean(onMapPress);
+    const sourceHtml = useMemo(
+      () =>
+        buildHtml(
+          markers,
+          region,
+          interactive,
+          initialSelectedCoordinate,
+          selectionEnabled,
+        ),
+      [
+        initialSelectedCoordinate,
+        interactive,
+        markers,
+        region,
+        selectionEnabled,
+      ],
+    );
 
-  return (
-    <WebView
-      bounces={false}
-      domStorageEnabled
-      javaScriptEnabled
-      originWhitelist={['*']}
-      scrollEnabled={false}
-      setSupportMultipleWindows={false}
-      source={{html: sourceHtml}}
-      style={styles.webView}
-      ref={refValue => {
-        webViewRef.current = refValue;
-      }}
-    />
-  );
-});
+    useImperativeHandle(
+      ref,
+      () => ({
+        fitToMarkers: () => runMapCommand(webViewRef.current, 'focusMarkers'),
+        zoomIn: () => runMapCommand(webViewRef.current, 'zoomIn'),
+        zoomOut: () => runMapCommand(webViewRef.current, 'zoomOut'),
+      }),
+      [],
+    );
+
+    const handleMessage = (event: WebViewMessageEvent) => {
+      if (!onMapPress) {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(event.nativeEvent.data) as {
+          coordinate?: OpenStreetMapCoordinate;
+          type?: string;
+        };
+
+        if (
+          payload.type === 'mapPress' &&
+          payload.coordinate &&
+          Number.isFinite(payload.coordinate.latitude) &&
+          Number.isFinite(payload.coordinate.longitude)
+        ) {
+          onMapPress(payload.coordinate);
+        }
+      } catch (error) {
+        return;
+      }
+    };
+
+    return (
+      <WebView
+        bounces={false}
+        domStorageEnabled
+        javaScriptEnabled
+        onMessage={selectionEnabled ? handleMessage : undefined}
+        originWhitelist={['*']}
+        ref={refValue => {
+          webViewRef.current = refValue;
+        }}
+        scrollEnabled={false}
+        setSupportMultipleWindows={false}
+        source={{html: sourceHtml}}
+        style={styles.webView}
+      />
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   webView: {

@@ -1,5 +1,5 @@
-import React from 'react';
-import {useState} from 'react';
+import React, {useEffect, useState} from 'react';
+import {ActivityIndicator, SafeAreaView, StyleSheet} from 'react-native';
 import {AppTab} from './src/components/AppBottomNav';
 import {AccountScreen} from './src/screens/AccountScreen';
 import {BookingsScreen} from './src/screens/BookingsScreen';
@@ -12,13 +12,16 @@ import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
 import {OwnerPropertyDetailsScreen} from './src/screens/OwnerPropertyDetailsScreen';
 import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
+import {clearAuthSession, restoreAuthSession} from './src/services/authSession';
 import {PropertyRecord} from './src/services/properties';
 import {SignUpScreen} from './src/screens/SignUpScreen';
+import {colors} from './src/theme';
 import {DashboardVariant} from './src/types/appFlow';
-import {clearAuthSession} from './src/services/authSession';
 
 const App: React.FC = () => {
-  const [screen, setScreen] = useState<'login' | 'signup' | 'home'>('login');
+  const [screen, setScreen] = useState<'loading' | 'login' | 'signup' | 'home'>(
+    'loading',
+  );
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
   const [dashboardVariant, setDashboardVariant] =
     useState<DashboardVariant>('standard');
@@ -28,6 +31,51 @@ const App: React.FC = () => {
   >('list');
   const [selectedOwnerProperty, setSelectedOwnerProperty] =
     useState<PropertyRecord | null>(null);
+
+  const navigateToHome = (variant: DashboardVariant) => {
+    setDashboardVariant(variant);
+    setAccountView('list');
+    setOwnerPropertiesView('list');
+    setSelectedOwnerProperty(null);
+    setActiveTab('dashboard');
+    setScreen('home');
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeApp = async () => {
+      try {
+        const session = await restoreAuthSession();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (session) {
+          setDashboardVariant(session.user.role === 'owner' ? 'owner' : 'standard');
+          setAccountView('list');
+          setOwnerPropertiesView('list');
+          setSelectedOwnerProperty(null);
+          setActiveTab('dashboard');
+          setScreen('home');
+          return;
+        }
+
+        setScreen('login');
+      } catch {
+        if (isMounted) {
+          setScreen('login');
+        }
+      }
+    };
+
+    void initializeApp();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleTabPress = (tab: AppTab) => {
     if (tab !== 'properties') {
@@ -40,6 +88,14 @@ const App: React.FC = () => {
 
     setActiveTab(tab);
   };
+
+  if (screen === 'loading') {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <ActivityIndicator color={colors.primary} size="large" />
+      </SafeAreaView>
+    );
+  }
 
   if (screen === 'home') {
     if (activeTab === 'properties') {
@@ -139,10 +195,11 @@ const App: React.FC = () => {
           activeTab={activeTab}
           onEditProfile={() => setAccountView('editProfile')}
           onLogout={() => {
-            clearAuthSession();
+            void clearAuthSession();
             setAccountView('list');
             setDashboardVariant('standard');
             setOwnerPropertiesView('list');
+            setSelectedOwnerProperty(null);
             setActiveTab('dashboard');
             setScreen('login');
           }}
@@ -173,13 +230,7 @@ const App: React.FC = () => {
   if (screen === 'signup') {
     return (
       <SignUpScreen
-        onNavigateToHome={variant => {
-          setDashboardVariant(variant);
-          setAccountView('list');
-          setOwnerPropertiesView('list');
-          setActiveTab('dashboard');
-          setScreen('home');
-        }}
+        onNavigateToHome={navigateToHome}
         onNavigateToSignIn={() => setScreen('login')}
       />
     );
@@ -187,16 +238,19 @@ const App: React.FC = () => {
 
   return (
     <LoginScreen
-      onNavigateToHome={variant => {
-        setDashboardVariant(variant);
-        setAccountView('list');
-        setOwnerPropertiesView('list');
-        setActiveTab('dashboard');
-        setScreen('home');
-      }}
+      onNavigateToHome={navigateToHome}
       onNavigateToSignUp={() => setScreen('signup')}
     />
   );
 };
+
+const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+  },
+});
 
 export default App;

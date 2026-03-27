@@ -12,8 +12,13 @@ import {
   View,
 } from 'react-native';
 import BackIcon from '../assets/images/left-arrow 2.svg';
+import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import DropdownIcon from '../assets/images/Vector 13.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {
+  PropertyLocationCoordinate,
+  PropertyLocationPickerModal,
+} from '../components/PropertyLocationPickerModal';
 import {useResponsive} from '../hooks/useResponsive';
 import {getAuthSession} from '../services/authSession';
 import {
@@ -39,6 +44,13 @@ type OwnerAddPropertyScreenProps = {
 type SelectFieldProps = {
   label: string;
   onPress?: () => void;
+  value: string;
+};
+
+type MapPickerFieldProps = {
+  hasValue: boolean;
+  label: string;
+  onPress: () => void;
   value: string;
 };
 
@@ -76,17 +88,6 @@ const formatMoneyValue = (value?: number | null) =>
 
 const formatDateValue = (value?: string | null) => formatIsoDateInput(value);
 
-const parseCoordinateValue = (value: string) => {
-  const normalizedValue = value.trim();
-
-  if (normalizedValue.length === 0) {
-    return null;
-  }
-
-  const parsed = Number(normalizedValue);
-  return Number.isFinite(parsed) ? parsed : NaN;
-};
-
 const parseMoneyValue = (value: string) => {
   const normalizedValue = value.trim();
 
@@ -111,6 +112,35 @@ const normalizeDateValue = (value: string) => {
 
   return isValidDateValue(normalizedValue) ? normalizedValue : 'INVALID_DATE';
 };
+
+const hasValidCoordinate = (value: number, min: number, max: number) =>
+  Number.isFinite(value) && value >= min && value <= max;
+
+const getInitialCoordinate = (
+  currentProperty?: PropertyRecord | null,
+): PropertyLocationCoordinate | null => {
+  if (
+    !currentProperty ||
+    !hasValidCoordinate(currentProperty.latitude, -90, 90) ||
+    !hasValidCoordinate(currentProperty.longitude, -180, 180)
+  ) {
+    return null;
+  }
+
+  return {
+    latitude: currentProperty.latitude,
+    longitude: currentProperty.longitude,
+  };
+};
+
+const formatCoordinateSummary = (
+  coordinate: PropertyLocationCoordinate | null,
+) =>
+  coordinate
+    ? `Lat ${formatCoordinateValue(coordinate.latitude)}, Lng ${formatCoordinateValue(
+        coordinate.longitude,
+      )}`
+    : 'Tap to pin the exact property location on the map';
 
 export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   activeTab,
@@ -149,10 +179,11 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   );
   const [amenities, setAmenities] = useState(property?.amenities.join(', ') ?? '');
   const [location, setLocation] = useState(property?.locationText ?? '');
-  const [latitude, setLatitude] = useState(formatCoordinateValue(property?.latitude));
-  const [longitude, setLongitude] = useState(
-    formatCoordinateValue(property?.longitude),
-  );
+  const [selectedCoordinate, setSelectedCoordinate] =
+    useState<PropertyLocationCoordinate | null>(() =>
+      getInitialCoordinate(property),
+    );
+  const [isMapPickerVisible, setIsMapPickerVisible] = useState(false);
   const [gallery, setGallery] = useState(property?.galleryUrls.join(', ') ?? '');
   const [description, setDescription] = useState(property?.description ?? '');
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'error'>(
@@ -215,41 +246,6 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
       return;
     }
 
-    const parsedLatitude = parseCoordinateValue(latitude);
-    const parsedLongitude = parseCoordinateValue(longitude);
-    const hasLatitude = latitude.trim().length > 0;
-    const hasLongitude = longitude.trim().length > 0;
-
-    if (hasLatitude !== hasLongitude) {
-      setSubmitState('error');
-      setInlineMessage('Add both latitude and longitude, or leave both empty.');
-      return;
-    }
-
-    if (
-      hasLatitude &&
-      (parsedLatitude === null ||
-        !Number.isFinite(parsedLatitude) ||
-        parsedLatitude < -90 ||
-        parsedLatitude > 90)
-    ) {
-      setSubmitState('error');
-      setInlineMessage('Latitude must be a valid number between -90 and 90.');
-      return;
-    }
-
-    if (
-      hasLongitude &&
-      (parsedLongitude === null ||
-        !Number.isFinite(parsedLongitude) ||
-        parsedLongitude < -180 ||
-        parsedLongitude > 180)
-    ) {
-      setSubmitState('error');
-      setInlineMessage('Longitude must be a valid number between -180 and 180.');
-      return;
-    }
-
     const session = getAuthSession();
     if (!session?.token) {
       setSubmitState('error');
@@ -268,8 +264,8 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
       availableTo: normalizedAvailableTo,
       amenities: parseCommaSeparatedValues(amenities),
       locationText: location.trim(),
-      latitude: hasLatitude ? parsedLatitude ?? undefined : undefined,
-      longitude: hasLongitude ? parsedLongitude ?? undefined : undefined,
+      latitude: selectedCoordinate?.latitude,
+      longitude: selectedCoordinate?.longitude,
       galleryUrls: parseCommaSeparatedValues(gallery),
       description: description.trim(),
     };
@@ -426,25 +422,19 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 value={location}
               />
 
-              <TextField
-                keyboardType="decimal-pad"
-                label="Latitude"
-                onChangeText={setLatitude}
-                placeholder="6.927100"
-                value={latitude}
-              />
-
-              <TextField
-                keyboardType="decimal-pad"
-                label="Longitude"
-                onChangeText={setLongitude}
-                placeholder="79.861200"
-                value={longitude}
+              <MapPickerField
+                hasValue={Boolean(selectedCoordinate)}
+                label="Select on Map"
+                onPress={() => setIsMapPickerVisible(true)}
+                value={formatCoordinateSummary(selectedCoordinate)}
               />
 
               <Text style={styles.helperText}>
-                Add exact latitude and longitude to place the property at its real
-                map position.
+                {selectedCoordinate
+                  ? `Saved coordinates: ${formatCoordinateValue(
+                      selectedCoordinate.latitude,
+                    )}, ${formatCoordinateValue(selectedCoordinate.longitude)}.`
+                  : 'Open the map, tap the exact property spot, and the app will save latitude and longitude automatically.'}
               </Text>
 
               <LargeField
@@ -490,6 +480,16 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
             </View>
           </ScrollView>
 
+          <PropertyLocationPickerModal
+            initialCoordinate={selectedCoordinate}
+            onClose={() => setIsMapPickerVisible(false)}
+            onConfirm={coordinate => {
+              setSelectedCoordinate(coordinate);
+              setIsMapPickerVisible(false);
+            }}
+            visible={isMapPickerVisible}
+          />
+
           <AppBottomNav activeTab={activeTab} onTabPress={onTabPress} />
         </View>
       </KeyboardAvoidingView>
@@ -531,6 +531,39 @@ const SelectField: React.FC<SelectFieldProps> = ({label, onPress, value}) => {
           {value}
         </Text>
         <DropdownIcon height={6} width={10} />
+      </Pressable>
+    </View>
+  );
+};
+
+const MapPickerField: React.FC<MapPickerFieldProps> = ({
+  hasValue,
+  label,
+  onPress,
+  value,
+}) => {
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({pressed}) => [
+          styles.mapPickerField,
+          pressed ? styles.pressed : null,
+        ]}>
+        <View style={styles.mapPickerValueRow}>
+          <MapMarkerIcon height={18} width={18} />
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.mapPickerValue,
+              !hasValue ? styles.mapPickerPlaceholder : null,
+            ]}>
+            {value}
+          </Text>
+        </View>
+        <Text style={styles.mapPickerAction}>OPEN</Text>
       </Pressable>
     </View>
   );
@@ -662,6 +695,45 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 14,
     marginRight: spacing.sm,
+  },
+  mapPickerField: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: '#E1E1E1',
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000000',
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    shadowOffset: {width: 0, height: 2},
+    elevation: 2,
+    gap: spacing.sm,
+  },
+  mapPickerValueRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  mapPickerValue: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+  },
+  mapPickerPlaceholder: {
+    color: '#8D847A',
+  },
+  mapPickerAction: {
+    color: colors.primary,
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    letterSpacing: 0.4,
   },
   inlineMessage: {
     fontFamily: fonts.medium,

@@ -97,7 +97,7 @@ export const useSignUpScreen = () => {
         role,
       });
 
-      setAuthSession(session);
+      await setAuthSession(session);
       setSubmitState('idle');
       setInlineMessage({
         text: 'Account created successfully.',
