@@ -8,15 +8,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import MapView, {Marker, Region} from 'react-native-maps';
-import {
-  OpenStreetMapCoordinate,
-  OpenStreetMapMarker,
-  OpenStreetMapView,
-} from './OpenStreetMapView';
+import MapView, {Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import {colors, fonts, radii, spacing} from '../theme';
 
-export type PropertyLocationCoordinate = OpenStreetMapCoordinate;
+export type PropertyLocationCoordinate = {
+  latitude: number;
+  longitude: number;
+};
 
 type PropertyLocationPickerModalProps = {
   initialCoordinate?: PropertyLocationCoordinate | null;
@@ -32,7 +30,8 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.08,
 };
 const PICKED_LOCATION_DELTA = 0.015;
-const EMPTY_MARKERS: OpenStreetMapMarker[] = [];
+const GOOGLE_MAP_PROVIDER =
+  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
 
 const formatCoordinate = (value: number) => value.toFixed(6);
 
@@ -107,44 +106,24 @@ export const PropertyLocationPickerModal: React.FC<
           </Text>
 
           <View style={styles.mapCard}>
-            {Platform.OS === 'android' ? (
-              <OpenStreetMapView
-                key={`osm-picker-${pickerSession}`}
-                initialSelectedCoordinate={initialCoordinate}
-                interactive
-                markers={EMPTY_MARKERS}
-                onMapPress={setDraftCoordinate}
-                region={initialRegion}
-              />
-            ) : (
-              <MapView
-                key={`native-picker-${pickerSession}`}
-                initialRegion={initialRegion}
-                onPress={event =>
-                  setDraftCoordinate(event.nativeEvent.coordinate)
-                }
-                showsCompass={false}
-                showsMyLocationButton={false}
-                showsScale={false}
-                style={styles.map}
-                toolbarEnabled={false}>
-                {selectedCoordinate ? (
-                  <Marker
-                    coordinate={selectedCoordinate}
-                    pinColor={colors.accent}
-                    title="Selected property location"
-                  />
-                ) : null}
-              </MapView>
-            )}
-
-            {Platform.OS === 'android' ? (
-              <View style={styles.attributionBadge}>
-                <Text style={styles.attributionText}>
-                  Map data OpenStreetMap
-                </Text>
-              </View>
-            ) : null}
+            <MapView
+              key={`google-picker-${pickerSession}`}
+              initialRegion={initialRegion}
+              onPress={event => setDraftCoordinate(event.nativeEvent.coordinate)}
+              provider={GOOGLE_MAP_PROVIDER}
+              showsCompass={false}
+              showsMyLocationButton={false}
+              showsScale={false}
+              style={styles.map}
+              toolbarEnabled={false}>
+              {selectedCoordinate ? (
+                <Marker
+                  coordinate={selectedCoordinate}
+                  pinColor={colors.accent}
+                  title="Selected property location"
+                />
+              ) : null}
+            </MapView>
           </View>
 
           <View style={styles.coordinateCard}>
@@ -247,21 +226,6 @@ const styles = StyleSheet.create({
   },
   map: {
     ...StyleSheet.absoluteFillObject,
-  },
-  attributionBadge: {
-    backgroundColor: 'rgba(25, 21, 19, 0.62)',
-    borderRadius: radii.pill,
-    left: spacing.md,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 6,
-    position: 'absolute',
-    top: spacing.md,
-  },
-  attributionText: {
-    color: colors.white,
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    lineHeight: 12,
   },
   coordinateCard: {
     backgroundColor: '#F7F0E5',

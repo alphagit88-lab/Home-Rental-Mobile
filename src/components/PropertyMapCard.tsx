@@ -7,8 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import MapView, {Marker, Region} from 'react-native-maps';
-import {OpenStreetMapView} from './OpenStreetMapView';
+import MapView, {Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import {colors, fonts, radii, spacing} from '../theme';
 
@@ -29,6 +28,8 @@ const getRegion = (coordinate: Coordinate): Region => ({
   latitudeDelta: 0.018,
   longitudeDelta: 0.018,
 });
+const GOOGLE_MAP_PROVIDER =
+  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
 
 export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
   latitude,
@@ -103,37 +104,22 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
 
       <View style={styles.mapCard}>
         {coordinate && region ? (
-          Platform.OS === 'android' ? (
-            <OpenStreetMapView
-              markers={[
-                {
-                  description: addressText,
-                  highlighted: true,
-                  latitude: coordinate.latitude,
-                  longitude: coordinate.longitude,
-                  title,
-                },
-              ]}
-              interactive={false}
-              region={region}
+          <MapView
+            initialRegion={region}
+            pitchEnabled={false}
+            provider={GOOGLE_MAP_PROVIDER}
+            rotateEnabled={false}
+            scrollEnabled={false}
+            style={styles.map}
+            toolbarEnabled={false}
+            zoomEnabled={false}>
+            <Marker
+              coordinate={coordinate}
+              description={addressText}
+              pinColor={colors.accent}
+              title={title}
             />
-          ) : (
-            <MapView
-              initialRegion={region}
-              pitchEnabled={false}
-              rotateEnabled={false}
-              scrollEnabled={false}
-              style={styles.map}
-              toolbarEnabled={false}
-              zoomEnabled={false}>
-              <Marker
-                coordinate={coordinate}
-                description={addressText}
-                pinColor={colors.accent}
-                title={title}
-              />
-            </MapView>
-          )
+          </MapView>
         ) : (
           <View style={styles.mapUnavailable}>
             <Text style={styles.mapUnavailableText}>
@@ -141,12 +127,6 @@ export const PropertyMapCard: React.FC<PropertyMapCardProps> = ({
             </Text>
           </View>
         )}
-
-        {Platform.OS === 'android' && coordinate ? (
-          <View style={styles.attributionBadge}>
-            <Text style={styles.attributionText}>Map data OpenStreetMap</Text>
-          </View>
-        ) : null}
 
         <View style={styles.mapBadge}>
           <MapMarkerIcon height={16} width={16} />
@@ -236,21 +216,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'center',
-  },
-  attributionBadge: {
-    position: 'absolute',
-    left: spacing.md,
-    top: spacing.md,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(25, 21, 19, 0.62)',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 6,
-  },
-  attributionText: {
-    color: colors.white,
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    lineHeight: 12,
   },
   mapBadge: {
     position: 'absolute',

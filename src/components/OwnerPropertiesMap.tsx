@@ -1,10 +1,6 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {Platform, Pressable, StyleSheet, Text, View} from 'react-native';
-import MapView, {Marker, Region} from 'react-native-maps';
-import {
-  OpenStreetMapView,
-  OpenStreetMapViewHandle,
-} from './OpenStreetMapView';
+import MapView, {Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import {PropertyRecord} from '../services/properties';
 import {colors, fonts, radii, spacing} from '../theme';
 
@@ -55,6 +51,9 @@ const getRegionFromProperties = (properties: PropertyRecord[]): Region => {
 const clampDelta = (value: number) => Math.min(Math.max(value, 0.005), 0.4);
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
+const MAP_EDGE_PADDING = {top: 64, right: 64, bottom: 64, left: 64};
+const GOOGLE_MAP_PROVIDER =
+  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
 
 const groupCoordinateKey = (latitude: number, longitude: number) =>
   `${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
@@ -111,40 +110,51 @@ export const OwnerPropertiesMap: React.FC<OwnerPropertiesMapProps> = ({
   properties,
 }) => {
   const nativeMapRef = useRef<MapView | null>(null);
-  const osmMapRef = useRef<OpenStreetMapViewHandle | null>(null);
   const initialRegion = useMemo(
     () => getRegionFromProperties(properties),
     [properties],
   );
   const [currentRegion, setCurrentRegion] = useState<Region>(initialRegion);
-  const activeRegion = Platform.OS === 'android' ? initialRegion : currentRegion;
+  const [isMapReady, setIsMapReady] = useState(false);
   const mapPins = useMemo(
-    () => buildMapPins(properties, activeRegion),
-    [activeRegion, properties],
+    () => buildMapPins(properties, currentRegion),
+    [currentRegion, properties],
   );
 
   useEffect(() => {
     const nextRegion = getRegionFromProperties(properties);
     setCurrentRegion(nextRegion);
 
-    if (Platform.OS === 'android') {
-      osmMapRef.current?.fitToMarkers();
-    } else {
-      nativeMapRef.current?.animateToRegion(nextRegion, 350);
-    }
-  }, [properties]);
-
-  const handleZoom = (direction: 'in' | 'out') => {
-    if (Platform.OS === 'android') {
-      if (direction === 'in') {
-        osmMapRef.current?.zoomIn();
-      } else {
-        osmMapRef.current?.zoomOut();
-      }
-
+    if (!isMapReady) {
       return;
     }
 
+    requestAnimationFrame(() => {
+      if (!nativeMapRef.current) {
+        return;
+      }
+
+      const nextPins = buildMapPins(properties, nextRegion);
+
+      if (nextPins.length > 1) {
+        nativeMapRef.current.fitToCoordinates(
+          nextPins.map(pin => ({
+            latitude: pin.displayLatitude,
+            longitude: pin.displayLongitude,
+          })),
+          {
+            animated: true,
+            edgePadding: MAP_EDGE_PADDING,
+          },
+        );
+        return;
+      }
+
+      nativeMapRef.current.animateToRegion(nextRegion, 350);
+    });
+  }, [isMapReady, properties]);
+
+  const handleZoom = (direction: 'in' | 'out') => {
     const factor = direction === 'in' ? 0.6 : 1.6;
     const nextRegion = {
       ...currentRegion,
@@ -158,54 +168,32 @@ export const OwnerPropertiesMap: React.FC<OwnerPropertiesMapProps> = ({
 
   return (
     <View style={styles.mapShell}>
-      {Platform.OS === 'android' ? (
-        <OpenStreetMapView
-          ref={ref => {
-            osmMapRef.current = ref;
-          }}
-          markers={mapPins.map(pin => ({
-            description: pin.locationText,
-            highlighted: properties.length === 1,
-            indexLabel: pin.indexLabel,
-            latitude: pin.displayLatitude,
-            longitude: pin.displayLongitude,
-            showTooltip: properties.length <= 4,
-            title: pin.title,
-          }))}
-          region={initialRegion}
-        />
-      ) : (
-        <MapView
-          region={currentRegion}
-          onRegionChangeComplete={setCurrentRegion}
-          ref={ref => {
-            nativeMapRef.current = ref;
-          }}
-          showsCompass={false}
-          showsMyLocationButton={false}
-          showsScale={false}
-          style={styles.map}
-          toolbarEnabled={false}>
-          {mapPins.map(pin => (
-            <Marker
-              coordinate={{
-                latitude: pin.displayLatitude,
-                longitude: pin.displayLongitude,
-              }}
-              key={pin.id}
-              pinColor={colors.accent}
-              title={`${pin.indexLabel} ${pin.title}`}
-              description={pin.locationText}
-            />
-          ))}
-        </MapView>
-      )}
-
-      {Platform.OS === 'android' ? (
-        <View style={styles.attributionBadge}>
-          <Text style={styles.attributionText}>Map data OpenStreetMap</Text>
-        </View>
-      ) : null}
+      <MapView
+        initialRegion={initialRegion}
+        onMapReady={() => setIsMapReady(true)}
+        onRegionChangeComplete={setCurrentRegion}
+        provider={GOOGLE_MAP_PROVIDER}
+        ref={ref => {
+          nativeMapRef.current = ref;
+        }}
+        showsCompass={false}
+        showsMyLocationButton={false}
+        showsScale={false}
+        style={styles.map}
+        toolbarEnabled={false}>
+        {mapPins.map(pin => (
+          <Marker
+            coordinate={{
+              latitude: pin.displayLatitude,
+              longitude: pin.displayLongitude,
+            }}
+            key={pin.id}
+            pinColor={colors.accent}
+            title={`${pin.indexLabel} ${pin.title}`}
+            description={pin.locationText}
+          />
+        ))}
+      </MapView>
 
       <View style={styles.controls}>
         <Pressable
@@ -251,21 +239,6 @@ const styles = StyleSheet.create({
   map: {
     width: '100%',
     height: '100%',
-  },
-  attributionBadge: {
-    position: 'absolute',
-    left: spacing.md,
-    top: spacing.md,
-    borderRadius: radii.pill,
-    backgroundColor: 'rgba(25, 21, 19, 0.62)',
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 6,
-  },
-  attributionText: {
-    color: colors.white,
-    fontFamily: fonts.medium,
-    fontSize: 10,
-    lineHeight: 12,
   },
   controls: {
     position: 'absolute',
