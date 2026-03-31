@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import {Platform} from 'react-native';
 
 export type RentalRole = 'tenant' | 'owner';
 
@@ -19,7 +19,7 @@ type ApiEnvelope<T> = {
   success: boolean;
   message?: string;
   data?: T;
-  errors?: Array<{ msg?: string; message?: string }>;
+  errors?: Array<{msg?: string; message?: string}>;
 };
 
 type SignInParams = {
@@ -41,9 +41,12 @@ type UpdateProfileParams = {
   newPassword?: string;
 };
 
-const MANUAL_API_BASE_URL = '';
-const ANDROID_EMULATOR_API_BASE_URL = 'http://10.0.2.2:5000';
-const IOS_SIMULATOR_API_BASE_URL = 'http://127.0.0.1:5000';
+const MANUAL_API_BASE_URL =
+  'https://intersection-easter-reader-bras.trycloudflare.com/';
+const ANDROID_EMULATOR_API_BASE_URL =
+  'https://intersection-easter-reader-bras.trycloudflare.com/';
+const IOS_SIMULATOR_API_BASE_URL =
+  'https://intersection-easter-reader-bras.trycloudflare.com/';
 
 const getApiBaseUrl = () => {
   if (MANUAL_API_BASE_URL) {
@@ -55,10 +58,16 @@ const getApiBaseUrl = () => {
     : IOS_SIMULATOR_API_BASE_URL;
 };
 
-const API_BASE_URL = getApiBaseUrl();
+const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '');
 
-const getErrorMessage = (body: ApiEnvelope<unknown> | null, fallback: string) => {
-  const validationMessage = body?.errors?.[0]?.msg ?? body?.errors?.[0]?.message;
+const API_BASE_URL = normalizeBaseUrl(getApiBaseUrl());
+
+const getErrorMessage = (
+  body: ApiEnvelope<unknown> | null,
+  fallback: string,
+) => {
+  const validationMessage =
+    body?.errors?.[0]?.msg ?? body?.errors?.[0]?.message;
 
   return validationMessage || body?.message || fallback;
 };
@@ -121,7 +130,7 @@ export const signUp = async (params: SignUpParams) =>
   );
 
 export const getCurrentUser = async (token: string) =>
-  request<{ user: AuthUser }>(
+  request<{user: AuthUser}>(
     '/api/rental-auth/me',
     {
       method: 'GET',
@@ -136,7 +145,7 @@ export const updateProfile = async (
   token: string,
   params: UpdateProfileParams,
 ) =>
-  request<{ user: AuthUser }>(
+  request<{user: AuthUser}>(
     '/api/rental-auth/profile',
     {
       method: 'PUT',
@@ -148,4 +157,4 @@ export const updateProfile = async (
     'Unable to update your profile.',
   );
 
-export { API_BASE_URL };
+export {API_BASE_URL};
