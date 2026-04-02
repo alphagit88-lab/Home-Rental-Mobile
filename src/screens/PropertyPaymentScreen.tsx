@@ -23,9 +23,12 @@ import VisaLogo from '../assets/images/visa-pay-logo.svg';
 import ProfileIcon from '../assets/images/iconamoon_profile-light.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {InlineStateMessage} from '../components/InlineStateMessage';
+import {InlineMessage} from '../hooks/useLoginScreen';
 import {useResponsive} from '../hooks/useResponsive';
+import {getAuthSession} from '../services/authSession';
 import {PropertyRecord} from '../services/properties';
-import {PropertyBookingDraft} from '../types/propertyBooking';
+import {BookingPaymentDraft, PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, spacing} from '../theme';
 import {
   formatPropertyAvailability,
@@ -38,7 +41,7 @@ type PropertyPaymentScreenProps = {
   activeTab: AppTab;
   bookingDraft: PropertyBookingDraft;
   onBack: () => void;
-  onBookNow: () => void;
+  onBookNow: (paymentDraft: BookingPaymentDraft) => Promise<void>;
   onTabPress: (tab: AppTab) => void;
   property: PropertyRecord;
 };
@@ -65,12 +68,17 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
   property,
 }) => {
   const responsive = useResponsive();
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const session = getAuthSession();
+  const [fullName, setFullName] = useState(session?.user.name ?? '');
+  const [email, setEmail] = useState(session?.user.email ?? '');
   const [cardNumber, setCardNumber] = useState('');
   const [cardHolderName, setCardHolderName] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
   const [cvv, setCvv] = useState('');
+  const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'error'>(
+    'idle',
+  );
+  const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
 
   const handleCardNumberChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, '').slice(0, 16);
@@ -91,6 +99,85 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
 
   const handleCvvChange = (value: string) => {
     setCvv(value.replace(/\D/g, '').slice(0, 3));
+  };
+
+  const handleBookNowPress = async () => {
+    if (!fullName.trim()) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter the booking contact name.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (!email.trim() || !email.includes('@')) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter a valid booking email address.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (cardNumber.replace(/\D/g, '').length !== 16) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter a valid 16-digit card number.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (!cardHolderName.trim()) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter the card holder name.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate)) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter the card expiry date in MM/YY format.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (cvv.length !== 3) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter the 3-digit CVV.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    setSubmitState('loading');
+    setInlineMessage(null);
+
+    try {
+      await onBookNow({
+        cardHolderName: cardHolderName.trim(),
+        cardNumber,
+        cvv,
+        email: email.trim().toLowerCase(),
+        expiryDate,
+        fullName: fullName.trim(),
+      });
+    } catch (error) {
+      setSubmitState('error');
+      setInlineMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Unable to submit your booking right now.',
+        tone: 'error',
+      });
+    }
   };
 
   return (
@@ -145,6 +232,12 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 value={String(bookingDraft.guestCount)}
               />
             </View>
+
+            {inlineMessage ? (
+              <View style={styles.inlineMessageWrap}>
+                <InlineStateMessage message={inlineMessage} />
+              </View>
+            ) : null}
 
             <InputField
               icon={<ProfileIcon height={22} width={22} />}
@@ -255,9 +348,17 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
 
             <Pressable
               accessibilityRole="button"
-              onPress={onBookNow}
-              style={styles.bookNowButton}>
-              <Text style={styles.bookNowButtonText}>Submit Booking</Text>
+              disabled={submitState === 'loading'}
+              onPress={() => {
+                void handleBookNowPress();
+              }}
+              style={[
+                styles.bookNowButton,
+                submitState === 'loading' ? styles.bookNowButtonDisabled : null,
+              ]}>
+              <Text style={styles.bookNowButtonText}>
+                {submitState === 'loading' ? 'Submitting...' : 'Submit Booking'}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -351,6 +452,9 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: {width: 0, height: 8},
     elevation: 6,
+    marginBottom: spacing.md,
+  },
+  inlineMessageWrap: {
     marginBottom: spacing.md,
   },
   sectionTitle: {
@@ -555,6 +659,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  bookNowButtonDisabled: {
+    opacity: 0.78,
   },
   bookNowButtonText: {
     color: colors.white,

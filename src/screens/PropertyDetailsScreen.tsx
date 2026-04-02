@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Image,
   Platform,
   Pressable,
   SafeAreaView,
@@ -13,6 +12,7 @@ import {
 import HeartIcon from '../assets/images/heart 1.svg';
 import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import HeroImage from '../assets/images/image.svg';
+import BackButtonGraphic from '../assets/images/Group 11.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {PropertyMapCard} from '../components/PropertyMapCard';
 import {useResponsive} from '../hooks/useResponsive';
@@ -80,10 +80,7 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                 accessibilityRole="button"
                 onPress={onBack}
                 style={[styles.backButton, {top: topOverlayOffset}]}>
-                <Image
-                  source={require('../assets/images/Group 11.png')}
-                  style={styles.backButtonImage}
-                />
+                <BackButtonGraphic height={42} width={46} />
               </Pressable>
 
               <View style={styles.heroTextWrap}>
@@ -219,11 +216,6 @@ const styles = StyleSheet.create({
     left: spacing.lg,
     bottom: spacing.lg + 10,
     zIndex: 2,
-  },
-  backButtonImage: {
-    width: 46,
-    height: 42,
-    resizeMode: 'contain',
   },
   heroTitle: {
     color: colors.white,

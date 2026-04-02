@@ -17,38 +17,21 @@ import CardImage from '../assets/images/Rectangle 3.4.svg';
 import StarIcon from '../assets/images/Star.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {useTenantBookings} from '../hooks/useTenantBookings';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
+import {
+  formatBookingDateLabel,
+  formatBookingMoney,
+  formatBookingRange,
+  formatBookingStatusLabel,
+} from '../utils/bookingPresentation';
 
 type BookingsScreenProps = {
   activeTab: AppTab;
   onSearchPress?: () => void;
   onTabPress: (tab: AppTab) => void;
 };
-
-const bookingCards = [
-  {
-    id: 'cozy-house',
-    title: 'Cozy House',
-    rating: '3.9',
-    reviews: 'Reviews (200)',
-    bookedOn: '23 July 2026',
-  },
-  {
-    id: 'colombo-lux',
-    title: 'Colombo Lux',
-    rating: '4.3',
-    reviews: 'Reviews (150)',
-    bookedOn: '18 March 2026',
-  },
-  {
-    id: 'resort',
-    title: 'Resort',
-    rating: '3.9',
-    reviews: 'Reviews (200)',
-    bookedOn: '8 March 2026',
-  },
-];
 
 export const BookingsScreen: React.FC<BookingsScreenProps> = ({
   activeTab,
@@ -57,6 +40,7 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
+  const {bookings, errorMessage, loading} = useTenantBookings();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
 
   return (
@@ -127,17 +111,35 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
               </Pressable>
             </View>
 
-            <View style={styles.bookingList}>
-              {bookingCards.map(card => (
-                <BookingCard
-                  key={card.id}
-                  bookedOn={card.bookedOn}
-                  rating={card.rating}
-                  reviews={card.reviews}
-                  title={card.title}
-                />
-              ))}
-            </View>
+            {loading ? (
+              <Text style={styles.stateText}>Loading your bookings...</Text>
+            ) : errorMessage ? (
+              <Text style={styles.stateText}>{errorMessage}</Text>
+            ) : bookings.length === 0 ? (
+              <Text style={styles.stateText}>
+                Your booking list will appear here after you make a reservation.
+              </Text>
+            ) : (
+              <View style={styles.bookingList}>
+                {bookings.map(booking => (
+                  <BookingCard
+                    bookedOn={formatBookingDateLabel(
+                      booking.createdAt ?? booking.checkIn,
+                    )}
+                    footerValue={formatBookingMoney(
+                      booking.totalAmount ?? booking.monthlyRent,
+                    )}
+                    key={booking.id}
+                    metaPrimary={formatBookingStatusLabel(booking.bookingStatus)}
+                    metaSecondary={formatBookingRange(
+                      booking.checkIn,
+                      booking.checkOut,
+                    )}
+                    title={booking.propertyTitle}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </ScrollView>
 
@@ -149,15 +151,17 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
 
 type BookingCardProps = {
   bookedOn: string;
-  rating: string;
-  reviews: string;
+  footerValue: string;
+  metaPrimary: string;
+  metaSecondary: string;
   title: string;
 };
 
 const BookingCard: React.FC<BookingCardProps> = ({
   bookedOn,
-  rating,
-  reviews,
+  footerValue,
+  metaPrimary,
+  metaSecondary,
   title,
 }) => {
   return (
@@ -177,9 +181,11 @@ const BookingCard: React.FC<BookingCardProps> = ({
         <View style={styles.ratingRow}>
           <View style={styles.ratingWrap}>
             <StarIcon height={13} width={13} />
-            <Text style={styles.ratingText}>{rating}</Text>
+            <Text style={styles.ratingText}>{metaPrimary}</Text>
           </View>
-          <Text style={styles.reviewsText}>{reviews}</Text>
+          <Text numberOfLines={1} style={styles.reviewsText}>
+            {metaSecondary}
+          </Text>
         </View>
 
         <Text style={styles.bookedOnText}>
@@ -187,7 +193,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
         </Text>
 
         <View style={styles.bookingFooter}>
-          <Text style={styles.bookingPrice}>LKR 25K</Text>
+          <Text style={styles.bookingPrice}>{footerValue}</Text>
 
           <Pressable accessibilityRole="button" style={styles.viewButton}>
             <Text style={styles.viewButtonText}>View</Text>
@@ -311,6 +317,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     borderBottomWidth: 1,
     borderBottomColor: '#E8E2DA',
+  },
+  stateText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: spacing.sm,
   },
   bookingCard: {
     flexDirection: 'row',

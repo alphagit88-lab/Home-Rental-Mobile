@@ -29,8 +29,10 @@ import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useTenantProperties} from '../hooks/useTenantProperties';
 import {useResponsive} from '../hooks/useResponsive';
+import {createBooking} from '../services/bookings';
+import {getAuthSession} from '../services/authSession';
 import {PropertyRecord} from '../services/properties';
-import {PropertyBookingDraft} from '../types/propertyBooking';
+import {BookingPaymentDraft, PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, radii, spacing} from '../theme';
 import {formatShortDateInput, normalizeDateString} from '../utils/dateInput';
 import {
@@ -152,8 +154,27 @@ const getTodayIsoDate = () => {
   );
 };
 
-const getLaterIsoDate = (firstValue: string, secondValue: string) =>
-  firstValue >= secondValue ? firstValue : secondValue;
+const addDaysToIsoDate = (value: string, days: number) => {
+  const normalizedValue = normalizeDateString(value);
+
+  if (!normalizedValue) {
+    return null;
+  }
+
+  const parsedDate = new Date(`${normalizedValue}T00:00:00Z`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return null;
+  }
+
+  parsedDate.setUTCDate(parsedDate.getUTCDate() + days);
+
+  return formatCalendarDate(
+    parsedDate.getUTCFullYear(),
+    parsedDate.getUTCMonth(),
+    parsedDate.getUTCDate(),
+  );
+};
 
 const getInitialCalendarState = (
   value: string,
@@ -313,8 +334,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const todayIsoDate = getTodayIsoDate();
   const normalizedCheckInDate = normalizeDateString(bookingDraft.checkIn) ?? '';
   const minimumCheckOutDate = normalizedCheckInDate
-    ? getLaterIsoDate(todayIsoDate, normalizedCheckInDate)
-    : todayIsoDate;
+    ? addDaysToIsoDate(normalizedCheckInDate, 1) ?? todayIsoDate
+    : addDaysToIsoDate(todayIsoDate, 1) ?? todayIsoDate;
 
   useEffect(() => {
     setBedroomRange([1, maximumBedrooms]);
@@ -438,8 +459,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           ...current,
           checkIn: formattedValue,
           checkOut:
-            normalizedCurrentCheckOut && normalizedCurrentCheckOut < value
-              ? formattedValue
+            normalizedCurrentCheckOut && normalizedCurrentCheckOut <= value
+              ? ''
               : current.checkOut,
         };
       });
@@ -478,7 +499,35 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
         activeTab={activeTab}
         bookingDraft={bookingDraft}
         onBack={() => setPaymentVisible(false)}
-        onBookNow={() => {
+        onBookNow={async (paymentDraft: BookingPaymentDraft) => {
+          const session = getAuthSession();
+          const normalizedBookingCheckIn = normalizeDateString(bookingDraft.checkIn);
+          const normalizedBookingCheckOut = normalizeDateString(
+            bookingDraft.checkOut,
+          );
+
+          if (!session?.token) {
+            throw new Error('Sign in to submit a booking.');
+          }
+
+          if (!normalizedBookingCheckIn || !normalizedBookingCheckOut) {
+            throw new Error('Please add valid check-in and check-out dates.');
+          }
+
+          const cardDigits = paymentDraft.cardNumber.replace(/\D/g, '');
+
+          await createBooking(session.token, {
+            cardLast4: cardDigits.length >= 4 ? cardDigits.slice(-4) : null,
+            checkIn: normalizedBookingCheckIn,
+            checkOut: normalizedBookingCheckOut,
+            contactEmail: paymentDraft.email,
+            contactName: paymentDraft.fullName,
+            guestCount: bookingDraft.guestCount,
+            paymentMethod: 'card',
+            propertyId: selectedProperty.id,
+          });
+
+          setBookingDraft(createBookingDraft());
           setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);

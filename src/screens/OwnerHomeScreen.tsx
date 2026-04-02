@@ -10,10 +10,15 @@ import {
   View,
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {useOwnerBookings} from '../hooks/useOwnerBookings';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useOwnerProperties} from '../hooks/useOwnerProperties';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
+import {
+  formatBookingRange,
+  formatBookingStatusLabel,
+} from '../utils/bookingPresentation';
 import MenuIcon from '../assets/images/menu 1.svg';
 import ProfilePic from '../assets/images/profile_pic.svg';
 import HeroBackground from '../assets/images/Untitled design (3) 1.svg';
@@ -31,8 +36,6 @@ type DashboardItem = {
   title: string;
 };
 
-const recentBookings: DashboardItem[] = [];
-
 export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
   activeTab,
   onViewBookingsPress,
@@ -41,6 +44,11 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const {
+    bookings,
+    errorMessage: bookingErrorMessage,
+    loading: bookingsLoading,
+  } = useOwnerBookings({limit: 3});
   const {
     errorMessage: propertyErrorMessage,
     loading: propertiesLoading,
@@ -53,6 +61,13 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
       title: property.title,
       subtitle: property.propertyCode,
     }));
+  const recentBookings: DashboardItem[] = bookings.slice(0, 3).map(booking => ({
+    id: `booking-${booking.id}`,
+    subtitle: `${formatBookingStatusLabel(
+      booking.bookingStatus,
+    )} | ${formatBookingRange(booking.checkIn, booking.checkOut)}`,
+    title: booking.propertyTitle,
+  }));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -136,9 +151,13 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
             </View>
 
             <DashboardSection
-              emptyMessage="Recent bookings will appear here when booking data is available."
+              emptyMessage={
+                bookingErrorMessage ??
+                'Recent bookings will appear here when booking data is available.'
+              }
               footerLabel="Bookings"
               items={recentBookings}
+              loading={bookingsLoading}
               onItemPress={() => onTabPress('bookings')}
               onViewAllPress={() => onTabPress('bookings')}
               title="Recent Bookings"

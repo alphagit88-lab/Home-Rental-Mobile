@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   Platform,
   Pressable,
@@ -10,9 +10,26 @@ import {
   View,
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {useOwnerBookings} from '../hooks/useOwnerBookings';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
+import {
+  addDaysToIsoDate,
+  buildCalendarGrid,
+  buildVisibleMonthEntries,
+  formatCalendarDate,
+  getEndOfMonthIsoDate,
+  getStartOfMonthIsoDate,
+  getTodayIsoDate,
+  iterateStayDates,
+  weekdayLabels,
+} from '../utils/bookingCalendar';
+import {
+  formatBookingDateLabel,
+  formatBookingRange,
+  formatBookingStatusLabel,
+} from '../utils/bookingPresentation';
 import MenuIcon from '../assets/images/menu 1.svg';
 import ProfilePic from '../assets/images/profile_pic.svg';
 import PlayIcon from '../assets/images/20 1.svg';
@@ -23,83 +40,10 @@ type OwnerBookingsScreenProps = {
   onTabPress: (tab: AppTab) => void;
 };
 
-type CalendarDay = {
-  id: string;
-  label: string;
-  muted?: boolean;
-  selected?: boolean;
-};
+type QuickFilter = 'last8Days' | 'lastMonth' | 'today' | null;
 
-type OwnerBooking = {
-  id: string;
-  subtitle: string;
-  title: string;
-};
-
-const weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-const calendarDays: CalendarDay[] = [
-  {id: 'd-27', label: '27', muted: true},
-  {id: 'd-28', label: '28', muted: true},
-  {id: 'd-01', label: '1', muted: true},
-  {id: 'd-02', label: '2', muted: true},
-  {id: 'd-03', label: '3', muted: true},
-  {id: 'd-04', label: '4', muted: true},
-  {id: 'd-05', label: '5', muted: true},
-  {id: 'd-06', label: '6', muted: true},
-  {id: 'd-07', label: '7', muted: true},
-  {id: 'd-08', label: '8', muted: true},
-  {id: 'd-09', label: '9', muted: true},
-  {id: 'd-10', label: '10', muted: true},
-  {id: 'd-11', label: '11', muted: true},
-  {id: 'd-12', label: '12', muted: true},
-  {id: 'd-13', label: '13', muted: true},
-  {id: 'd-14', label: '14', selected: true},
-  {id: 'd-15', label: '15'},
-  {id: 'd-16', label: '16'},
-  {id: 'd-17', label: '17'},
-  {id: 'd-18', label: '18'},
-  {id: 'd-19', label: '19'},
-  {id: 'd-20', label: '20'},
-  {id: 'd-21', label: '21'},
-  {id: 'd-22', label: '22'},
-  {id: 'd-23', label: '23'},
-  {id: 'd-24', label: '24'},
-  {id: 'd-25', label: '25'},
-  {id: 'd-26', label: '26'},
-  {id: 'd-27b', label: '27'},
-  {id: 'd-28b', label: '28'},
-  {id: 'd-29', label: '29'},
-  {id: 'd-30', label: '30'},
-  {id: 'd-31', label: '31'},
-  {id: 'd-01b', label: '1', muted: true},
-  {id: 'd-02b', label: '2', muted: true},
-];
-
-const monthLabels = ['Jul', 'Jun', 'Mai', 'Apr', 'Mar', 'Feb', 'Jan', 'Dec', 'Nov'];
-
-const ownerBookings: OwnerBooking[] = [
-  {
-    id: 'booking-1',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-  {
-    id: 'booking-2',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-  {
-    id: 'booking-3',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-  {
-    id: 'booking-4',
-    title: 'Colombo Lux House',
-    subtitle: 'Move-in 2026 FEB 26',
-  },
-];
+const isDateInWindow = (value: string, from: string, to: string) =>
+  value >= from && value <= to;
 
 export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
   activeTab,
@@ -108,6 +52,166 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
   const responsive = useResponsive();
   const home = useHomeScreen();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const today = new Date();
+  const todayIsoDate = getTodayIsoDate();
+  const [selectedYear, setSelectedYear] = useState(today.getUTCFullYear());
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(
+    today.getUTCMonth(),
+  );
+  const [selectedDay, setSelectedDay] = useState<string | null>(todayIsoDate);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('today');
+  const visibleMonths = useMemo(
+    () => buildVisibleMonthEntries(selectedYear, selectedMonthIndex),
+    [selectedMonthIndex, selectedYear],
+  );
+  const queryFrom = getStartOfMonthIsoDate(
+    visibleMonths[0].year,
+    visibleMonths[0].monthIndex,
+  );
+  const lastVisibleMonth = visibleMonths[visibleMonths.length - 1];
+  const queryTo = getEndOfMonthIsoDate(
+    lastVisibleMonth.year,
+    lastVisibleMonth.monthIndex,
+  );
+  const {
+    bookings,
+    errorMessage,
+    loading,
+    reload,
+  } = useOwnerBookings({from: queryFrom, to: queryTo});
+  const selectedMonthStart = getStartOfMonthIsoDate(selectedYear, selectedMonthIndex);
+  const selectedMonthEnd = getEndOfMonthIsoDate(selectedYear, selectedMonthIndex);
+  const last8DaysStart = addDaysToIsoDate(todayIsoDate, -7) ?? todayIsoDate;
+  const previousMonthDate = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 1, 1),
+  );
+  const previousMonthStart = getStartOfMonthIsoDate(
+    previousMonthDate.getUTCFullYear(),
+    previousMonthDate.getUTCMonth(),
+  );
+  const previousMonthEnd = getEndOfMonthIsoDate(
+    previousMonthDate.getUTCFullYear(),
+    previousMonthDate.getUTCMonth(),
+  );
+  const visibleBookings = useMemo(
+    () =>
+      bookings
+        .filter(booking => {
+          const stayDates = iterateStayDates(booking.checkIn, booking.checkOut);
+
+          if (stayDates.length === 0) {
+            return false;
+          }
+
+          if (selectedDay) {
+            return stayDates.includes(selectedDay);
+          }
+
+          if (quickFilter === 'today') {
+            return stayDates.includes(todayIsoDate);
+          }
+
+          if (quickFilter === 'last8Days') {
+            return stayDates.some(date =>
+              isDateInWindow(date, last8DaysStart, todayIsoDate),
+            );
+          }
+
+          if (quickFilter === 'lastMonth') {
+            return stayDates.some(date =>
+              isDateInWindow(date, previousMonthStart, previousMonthEnd),
+            );
+          }
+
+          return stayDates.some(date =>
+            isDateInWindow(date, selectedMonthStart, selectedMonthEnd),
+          );
+        })
+        .sort((first, second) => first.checkIn.localeCompare(second.checkIn)),
+    [
+      bookings,
+      last8DaysStart,
+      previousMonthEnd,
+      previousMonthStart,
+      quickFilter,
+      selectedDay,
+      selectedMonthEnd,
+      selectedMonthStart,
+      todayIsoDate,
+    ],
+  );
+  const bookedDateCounts = useMemo(() => {
+    const dateCounts = new Map<string, number>();
+
+    bookings.forEach(booking => {
+      iterateStayDates(booking.checkIn, booking.checkOut).forEach(date => {
+        if (!isDateInWindow(date, selectedMonthStart, selectedMonthEnd)) {
+          return;
+        }
+
+        dateCounts.set(date, (dateCounts.get(date) ?? 0) + 1);
+      });
+    });
+
+    return dateCounts;
+  }, [bookings, selectedMonthEnd, selectedMonthStart]);
+  const calendarDays = useMemo(() => {
+    const daySlots = buildCalendarGrid(selectedYear, selectedMonthIndex);
+
+    return daySlots.map((day, index) => {
+      if (day === null) {
+        return {
+          id: `empty-${index}`,
+          label: '',
+          muted: true,
+          value: null,
+        };
+      }
+
+      const dateValue = formatCalendarDate(selectedYear, selectedMonthIndex, day);
+
+      return {
+        bookingCount: bookedDateCounts.get(dateValue) ?? 0,
+        id: dateValue,
+        label: String(day),
+        muted: false,
+        selected:
+          (selectedDay && selectedDay === dateValue) ||
+          (!selectedDay && quickFilter === 'today' && dateValue === todayIsoDate),
+        value: dateValue,
+      };
+    });
+  }, [
+    bookedDateCounts,
+    quickFilter,
+    selectedDay,
+    selectedMonthIndex,
+    selectedYear,
+    todayIsoDate,
+  ]);
+
+  const handleQuickFilterPress = (value: QuickFilter) => {
+    if (value === 'today') {
+      setSelectedYear(today.getUTCFullYear());
+      setSelectedMonthIndex(today.getUTCMonth());
+      setSelectedDay(todayIsoDate);
+      setQuickFilter('today');
+      return;
+    }
+
+    if (value === 'lastMonth') {
+      setSelectedYear(previousMonthDate.getUTCFullYear());
+      setSelectedMonthIndex(previousMonthDate.getUTCMonth());
+      setSelectedDay(null);
+      setQuickFilter('lastMonth');
+      return;
+    }
+
+    setSelectedYear(today.getUTCFullYear());
+    setSelectedMonthIndex(today.getUTCMonth());
+    setSelectedDay(null);
+    setQuickFilter(value);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -153,12 +257,35 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
 
               <View style={styles.calendarToolbar}>
                 <View style={styles.filterPillRow}>
-                  <FilterPill label="Today" selected />
-                  <FilterPill label="Last 8 days" />
-                  <FilterPill label="Last month" />
+                  <FilterPill
+                    label="Today"
+                    onPress={() => handleQuickFilterPress('today')}
+                    selected={quickFilter === 'today'}
+                  />
+                  <FilterPill
+                    label="Last 8 days"
+                    onPress={() => handleQuickFilterPress('last8Days')}
+                    selected={quickFilter === 'last8Days'}
+                  />
+                  <FilterPill
+                    label="Last month"
+                    onPress={() => handleQuickFilterPress('lastMonth')}
+                    selected={quickFilter === 'lastMonth'}
+                  />
                 </View>
 
-                <Pressable accessibilityRole="button" style={styles.dropdownButton}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    const nextMonthDate = new Date(
+                      Date.UTC(selectedYear, selectedMonthIndex + 1, 1),
+                    );
+                    setSelectedYear(nextMonthDate.getUTCFullYear());
+                    setSelectedMonthIndex(nextMonthDate.getUTCMonth());
+                    setSelectedDay(null);
+                    setQuickFilter(null);
+                  }}
+                  style={styles.dropdownButton}>
                   <CalendarDropdownIcon height={8} width={10} />
                 </Pressable>
               </View>
@@ -175,12 +302,23 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
 
                   <View style={styles.daysGrid}>
                     {calendarDays.map(day => (
-                      <View
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={!day.value}
                         key={day.id}
+                        onPress={() => {
+                          if (!day.value) {
+                            return;
+                          }
+
+                          setSelectedDay(day.value);
+                          setQuickFilter(null);
+                        }}
                         style={[
                           styles.dayCell,
                           day.selected ? styles.dayCellSelected : null,
                           day.muted ? styles.dayCellMuted : null,
+                          (day.bookingCount ?? 0) > 0 ? styles.dayCellBooked : null,
                         ]}>
                         <Text
                           style={[
@@ -190,37 +328,74 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
                           ]}>
                           {day.label}
                         </Text>
-                      </View>
+                        {(day.bookingCount ?? 0) > 0 ? (
+                          <View
+                            style={[
+                              styles.dayIndicator,
+                              day.selected ? styles.dayIndicatorSelected : null,
+                            ]}
+                          />
+                        ) : null}
+                      </Pressable>
                     ))}
                   </View>
                 </View>
 
                 <View style={styles.monthColumn}>
-                  {monthLabels.map(label => (
-                    <View
-                      key={label}
+                  {visibleMonths.map(month => (
+                    <Pressable
+                      accessibilityRole="button"
+                      key={month.key}
+                      onPress={() => {
+                        setSelectedYear(month.year);
+                        setSelectedMonthIndex(month.monthIndex);
+                        setSelectedDay(null);
+                        setQuickFilter(null);
+                      }}
                       style={[
                         styles.monthRow,
-                        label === 'Mar' ? styles.monthRowActive : null,
+                        month.year === selectedYear &&
+                        month.monthIndex === selectedMonthIndex
+                          ? styles.monthRowActive
+                          : null,
                       ]}>
                       <Text
                         style={[
                           styles.monthText,
-                          label === 'Mar' ? styles.monthTextActive : null,
-                          label !== 'Mar' ? styles.monthTextMuted : null,
+                          month.year === selectedYear &&
+                          month.monthIndex === selectedMonthIndex
+                            ? styles.monthTextActive
+                            : null,
+                          month.year !== selectedYear ||
+                          month.monthIndex !== selectedMonthIndex
+                            ? styles.monthTextMuted
+                            : null,
                         ]}>
-                        {label}
+                        {month.label}
                       </Text>
-                    </View>
+                    </Pressable>
                   ))}
                 </View>
               </View>
 
               <View style={styles.calendarFooter}>
-                <Pressable accessibilityRole="button" style={styles.clearButton}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setSelectedYear(today.getUTCFullYear());
+                    setSelectedMonthIndex(today.getUTCMonth());
+                    setSelectedDay(null);
+                    setQuickFilter(null);
+                  }}
+                  style={styles.clearButton}>
                   <Text style={styles.clearButtonText}>Clear</Text>
                 </Pressable>
-                <Pressable accessibilityRole="button" style={styles.applyButton}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    void reload();
+                  }}
+                  style={styles.applyButton}>
                   <Text style={styles.applyButtonText}>Apply</Text>
                 </Pressable>
               </View>
@@ -230,13 +405,29 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
               <Text style={styles.bookingsTitle}>Bookings</Text>
 
               <View style={styles.bookingList}>
-                {ownerBookings.map(booking => (
-                  <BookingListItem
-                    key={booking.id}
-                    subtitle={booking.subtitle}
-                    title={booking.title}
-                  />
-                ))}
+                {loading ? (
+                  <Text style={styles.stateText}>Loading your bookings...</Text>
+                ) : errorMessage ? (
+                  <Text style={styles.stateText}>{errorMessage}</Text>
+                ) : visibleBookings.length === 0 ? (
+                  <Text style={styles.stateText}>
+                    No bookings match the selected calendar view.
+                  </Text>
+                ) : (
+                  visibleBookings.map(booking => (
+                    <BookingListItem
+                      key={booking.id}
+                      subtitle={`${formatBookingStatusLabel(
+                        booking.bookingStatus,
+                      )} | ${booking.tenantName ?? 'Tenant'} | ${formatBookingRange(
+                        booking.checkIn,
+                        booking.checkOut,
+                      )}`}
+                      title={booking.propertyTitle}
+                      trailingLabel={formatBookingDateLabel(booking.createdAt)}
+                    />
+                  ))
+                )}
               </View>
             </View>
           </View>
@@ -250,12 +441,19 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
 
 type FilterPillProps = {
   label: string;
+  onPress: () => void;
   selected?: boolean;
 };
 
-const FilterPill: React.FC<FilterPillProps> = ({label, selected}) => {
+const FilterPill: React.FC<FilterPillProps> = ({label, onPress, selected}) => {
   return (
-    <View style={[styles.filterPill, selected ? styles.filterPillSelected : null]}>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[
+        styles.filterPill,
+        selected ? styles.filterPillSelected : null,
+      ]}>
       <Text
         style={[
           styles.filterPillText,
@@ -263,16 +461,21 @@ const FilterPill: React.FC<FilterPillProps> = ({label, selected}) => {
         ]}>
         {label}
       </Text>
-    </View>
+    </Pressable>
   );
 };
 
 type BookingListItemProps = {
   subtitle: string;
+  trailingLabel: string;
   title: string;
 };
 
-const BookingListItem: React.FC<BookingListItemProps> = ({subtitle, title}) => {
+const BookingListItem: React.FC<BookingListItemProps> = ({
+  subtitle,
+  title,
+  trailingLabel,
+}) => {
   return (
     <View style={styles.bookingItem}>
       <View style={styles.bookingItemTextWrap}>
@@ -285,7 +488,9 @@ const BookingListItem: React.FC<BookingListItemProps> = ({subtitle, title}) => {
       </View>
 
       <Pressable accessibilityRole="button" style={styles.viewButton}>
-        <Text style={styles.viewButtonText}>View</Text>
+        <Text numberOfLines={1} style={styles.viewButtonText}>
+          {trailingLabel}
+        </Text>
         <View style={styles.playIconCircle}>
           <View style={styles.playIconGlyphWrap}>
             <PlayIcon height={10} style={styles.playIconRight} width={10} />
@@ -442,6 +647,9 @@ const styles = StyleSheet.create({
   dayCellSelected: {
     paddingVertical: 0,
   },
+  dayCellBooked: {
+    position: 'relative',
+  },
   dayCellMuted: {
     opacity: 0.48,
   },
@@ -465,6 +673,16 @@ const styles = StyleSheet.create({
   dayCellTextMuted: {
     backgroundColor: '#F3F1EE',
     color: '#BFBFBF',
+  },
+  dayIndicator: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+    marginTop: 4,
+  },
+  dayIndicatorSelected: {
+    backgroundColor: colors.white,
   },
   monthColumn: {
     width: 40,
@@ -548,6 +766,12 @@ const styles = StyleSheet.create({
   bookingList: {
     gap: spacing.sm,
   },
+  stateText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+  },
   bookingItem: {
     backgroundColor: colors.primary,
     borderRadius: 10,
@@ -575,6 +799,7 @@ const styles = StyleSheet.create({
   },
   viewButton: {
     minHeight: 28,
+    minWidth: 116,
     borderRadius: radii.pill,
     backgroundColor: colors.accent,
     flexDirection: 'row',
@@ -586,7 +811,7 @@ const styles = StyleSheet.create({
   viewButtonText: {
     color: colors.white,
     fontFamily: fonts.medium,
-    fontSize: 12,
+    fontSize: 10,
   },
   playIconCircle: {
     width: 20,
