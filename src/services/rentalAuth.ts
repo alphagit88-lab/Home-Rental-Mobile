@@ -42,11 +42,11 @@ type UpdateProfileParams = {
 };
 
 const MANUAL_API_BASE_URL =
-  'https://intersection-easter-reader-bras.trycloudflare.com/';
+  'https://regulation-energy-carl-cedar.trycloudflare.com/';
 const ANDROID_EMULATOR_API_BASE_URL =
-  'https://intersection-easter-reader-bras.trycloudflare.com/';
+  'https://regulation-energy-carl-cedar.trycloudflare.com/';
 const IOS_SIMULATOR_API_BASE_URL =
-  'https://intersection-easter-reader-bras.trycloudflare.com/';
+  'https://regulation-energy-carl-cedar.trycloudflare.com/';
 
 const getApiBaseUrl = () => {
   if (MANUAL_API_BASE_URL) {
