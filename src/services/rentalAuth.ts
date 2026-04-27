@@ -1,6 +1,7 @@
 import {Platform} from 'react-native';
 
 export type RentalRole = 'tenant' | 'owner';
+type BackendTarget = 'cloudflare' | 'local';
 
 export type AuthUser = {
   id: number;
@@ -41,21 +42,33 @@ type UpdateProfileParams = {
   newPassword?: string;
 };
 
-const MANUAL_API_BASE_URL =
-  'https://regulation-energy-carl-cedar.trycloudflare.com/';
-const ANDROID_EMULATOR_API_BASE_URL =
-  'https://regulation-energy-carl-cedar.trycloudflare.com/';
-const IOS_SIMULATOR_API_BASE_URL =
+// Switch this between 'local' and 'cloudflare' depending on what you want to test.
+const API_BACKEND_TARGET: BackendTarget = 'local';
+const CLOUDFLARE_API_BASE_URL =
   'https://regulation-energy-carl-cedar.trycloudflare.com/';
 
-const getApiBaseUrl = () => {
-  if (MANUAL_API_BASE_URL) {
-    return MANUAL_API_BASE_URL;
+// Use your machine LAN IP for testing from a physical device on the same network.
+const LOCAL_MANUAL_API_BASE_URL = 'http://192.168.1.103:5001';
+const LOCAL_ANDROID_EMULATOR_API_BASE_URL = 'http://10.0.2.2:5001';
+const LOCAL_IOS_SIMULATOR_API_BASE_URL = 'http://localhost:5001';
+
+const getLocalApiBaseUrl = () => {
+  if (LOCAL_MANUAL_API_BASE_URL) {
+    return LOCAL_MANUAL_API_BASE_URL;
   }
 
   return Platform.OS === 'android'
-    ? ANDROID_EMULATOR_API_BASE_URL
-    : IOS_SIMULATOR_API_BASE_URL;
+    ? LOCAL_ANDROID_EMULATOR_API_BASE_URL
+    : LOCAL_IOS_SIMULATOR_API_BASE_URL;
+};
+
+const getApiBaseUrl = () => {
+  const apiBaseUrls: Record<BackendTarget, string> = {
+    cloudflare: CLOUDFLARE_API_BASE_URL,
+    local: getLocalApiBaseUrl(),
+  };
+
+  return apiBaseUrls[API_BACKEND_TARGET];
 };
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '');
@@ -90,7 +103,7 @@ const request = async <T>(
     });
   } catch (error) {
     throw new Error(
-      'Cannot reach the backend. Check the API base URL in src/services/rentalAuth.ts.',
+      `Cannot reach the backend at ${API_BASE_URL}. Check the API config in src/services/rentalAuth.ts.`,
     );
   }
 
