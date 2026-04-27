@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { DashboardVariant } from '../types/appFlow';
 import { setAuthSession } from '../services/authSession';
-import { signIn } from '../services/rentalAuth';
+import {RentalRole, signIn} from '../services/rentalAuth';
+import {getDashboardVariantForRole} from '../types/appFlow';
 
 export type WelcomeContent = {
   greeting: string;
@@ -93,7 +94,12 @@ export const useLoginScreen = () => {
     setInlineMessage(null);
 
     try {
-      const expectedRole = dashboardVariant === 'owner' ? 'owner' : 'tenant';
+      const expectedRole: RentalRole =
+        dashboardVariant === 'owner'
+          ? 'owner'
+          : dashboardVariant === 'serviceProvider'
+            ? 'service_provider'
+            : 'tenant';
       const session = await signIn({
         email: email.trim().toLowerCase(),
         password,
@@ -102,10 +108,17 @@ export const useLoginScreen = () => {
       if (session.user.role !== expectedRole) {
         setSubmitState('error');
         setInlineMessage({
-          text:
-            expectedRole === 'owner'
-              ? 'This account is not a Property Owner account. Select Tenant to continue.'
-              : 'This account is not a Tenant account. Select Property Owner to continue.',
+          text: (() => {
+            if (expectedRole === 'owner') {
+              return 'This account is not a Property Owner account. Choose the matching role to continue.';
+            }
+
+            if (expectedRole === 'service_provider') {
+              return 'This account is not a Service Provider account. Choose the matching role to continue.';
+            }
+
+            return 'This account is not a Tenant account. Choose the matching role to continue.';
+          })(),
           tone: 'error',
         });
         return;
@@ -119,7 +132,7 @@ export const useLoginScreen = () => {
         text: `Welcome back, ${session.user.name}.`,
         tone: 'success',
       });
-      onSuccess?.(session.user.role === 'owner' ? 'owner' : 'standard');
+      onSuccess?.(getDashboardVariantForRole(session.user.role));
     } catch (error) {
       setSubmitState('error');
       setInlineMessage({

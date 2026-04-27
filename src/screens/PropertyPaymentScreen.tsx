@@ -231,6 +231,18 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 label="Guests"
                 value={String(bookingDraft.guestCount)}
               />
+              <SummaryRow
+                label="Services"
+                value={
+                  bookingDraft.serviceCategoryNames.length > 0
+                    ? bookingDraft.serviceCategoryNames.join(', ')
+                    : 'No extra services'
+                }
+              />
+              <SummaryRow
+                label="Service note"
+                value={bookingDraft.serviceNotes.trim() || 'No note added'}
+              />
             </View>
 
             {inlineMessage ? (

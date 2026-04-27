@@ -7,6 +7,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import DateIcon from '../assets/images/clarity_date-line.svg';
@@ -19,6 +20,7 @@ import {InlineStateMessage} from '../components/InlineStateMessage';
 import {InlineMessage} from '../hooks/useLoginScreen';
 import {usePropertyBookingAvailability} from '../hooks/usePropertyBookingAvailability';
 import {useResponsive} from '../hooks/useResponsive';
+import {useServiceCategories} from '../hooks/useServiceCategories';
 import {PropertyRecord} from '../services/properties';
 import {PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, spacing} from '../theme';
@@ -36,6 +38,8 @@ import {
 } from '../utils/bookingCalendar';
 import {
   formatPropertyAvailability,
+  getLatestPropertyCheckInDate,
+  hasPropertyBookableStayDates,
   formatPropertyRent,
 } from '../utils/propertyPresentation';
 
@@ -133,6 +137,13 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   const minimumCheckInDate = normalizedPropertyAvailableFrom
     ? getLaterIsoDate(todayIsoDate, normalizedPropertyAvailableFrom)
     : todayIsoDate;
+  const maximumCheckInDate =
+    getLatestPropertyCheckInDate(normalizedPropertyAvailableTo);
+  const hasBookableStayDates = hasPropertyBookableStayDates(
+    property.availableFrom,
+    property.availableTo,
+    todayIsoDate,
+  );
   const availabilityTo =
     normalizedPropertyAvailableTo ??
     addDaysToIsoDate(todayIsoDate, 365) ??
@@ -145,6 +156,11 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
     from: minimumCheckInDate,
     to: availabilityTo,
   });
+  const {
+    categories: serviceCategories,
+    errorMessage: serviceCategoryErrorMessage,
+    loading: serviceCategoriesLoading,
+  } = useServiceCategories();
   const blockedDates = useMemo(
     () => new Set(availability?.bookedDates ?? []),
     [availability?.bookedDates],
@@ -155,10 +171,44 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
     ? addDaysToIsoDate(normalizedCheckInDate, 1) ?? minimumCheckInDate
     : addDaysToIsoDate(minimumCheckInDate, 1) ?? minimumCheckInDate;
 
+  const toggleServiceCategory = (categoryId: number) => {
+    const nextCategoryIds = bookingDraft.serviceCategoryIds.includes(categoryId)
+      ? bookingDraft.serviceCategoryIds.filter(id => id !== categoryId)
+      : [...bookingDraft.serviceCategoryIds, categoryId];
+    const nextCategoryNames = serviceCategories
+      .filter(category => nextCategoryIds.includes(category.id))
+      .map(category => category.name);
+
+    onUpdateBookingDraft({
+      serviceCategoryIds: nextCategoryIds,
+      serviceCategoryNames: nextCategoryNames,
+    });
+  };
+
   const openBookingDatePicker = (field: BookingDateField) => {
+    if (!hasBookableStayDates) {
+      setInlineMessage({
+        text: 'This property no longer has selectable stay dates.',
+        tone: 'error',
+      });
+      return;
+    }
+
     if (field === 'checkOut' && !normalizedCheckInDate) {
       setInlineMessage({
         text: 'Please select the check-in date first.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    if (
+      field === 'checkOut' &&
+      normalizedPropertyAvailableTo &&
+      minimumCheckOutDate > normalizedPropertyAvailableTo
+    ) {
+      setInlineMessage({
+        text: 'Please choose an earlier check-in date before selecting check-out.',
         tone: 'error',
       });
       return;
@@ -336,7 +386,9 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
                 Add your preferred stay dates and guest count before you continue.
               </Text>
               <Text style={styles.noticeSubtext}>
-                {availabilityLoading
+                {!hasBookableStayDates
+                  ? 'This listing is no longer available for a new stay.'
+                  : availabilityLoading
                   ? 'Loading booked dates for this property...'
                   : availabilityErrorMessage
                     ? availabilityErrorMessage
@@ -397,6 +449,69 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
               </View>
             </View>
 
+            <View style={styles.servicesCard}>
+              <Text style={styles.servicesTitle}>Extra services</Text>
+              <Text style={styles.servicesText}>
+                Choose optional services for this booking. Matching nearby
+                service providers can accept or reject the request.
+              </Text>
+
+              {serviceCategoriesLoading ? (
+                <Text style={styles.servicesStateText}>
+                  Loading service options...
+                </Text>
+              ) : serviceCategoryErrorMessage ? (
+                <Text style={styles.servicesStateText}>
+                  {serviceCategoryErrorMessage}
+                </Text>
+              ) : serviceCategories.length === 0 ? (
+                <Text style={styles.servicesStateText}>
+                  No service categories are available right now.
+                </Text>
+              ) : (
+                <View style={styles.servicesChipWrap}>
+                  {serviceCategories.map(category => {
+                    const selected = bookingDraft.serviceCategoryIds.includes(
+                      category.id,
+                    );
+
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        key={category.id}
+                        onPress={() => toggleServiceCategory(category.id)}
+                        style={({pressed}) => [
+                          styles.serviceChip,
+                          selected ? styles.serviceChipSelected : null,
+                          pressed ? styles.dateInputPressed : null,
+                        ]}>
+                        <Text
+                          style={[
+                            styles.serviceChipText,
+                            selected ? styles.serviceChipTextSelected : null,
+                          ]}>
+                          {category.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              <Text style={styles.serviceNoteLabel}>Service note</Text>
+              <TextInput
+                multiline
+                onChangeText={value =>
+                  onUpdateBookingDraft({serviceNotes: value})
+                }
+                placeholder="Add details for the provider, for example food, timing, or special instructions."
+                placeholderTextColor="#A29A91"
+                style={styles.serviceNotesInput}
+                textAlignVertical="top"
+                value={bookingDraft.serviceNotes}
+              />
+            </View>
+
             <View style={styles.summaryPanel}>
               <Text style={styles.summaryPanelTitle}>Property Summary</Text>
               <SummaryRow label="Listing Type" value={property.listingType} />
@@ -427,6 +542,14 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
                   property.availableTo,
                 )}
               />
+              <SummaryRow
+                label="Services"
+                value={
+                  bookingDraft.serviceCategoryNames.length > 0
+                    ? bookingDraft.serviceCategoryNames.join(', ')
+                    : 'No extra services'
+                }
+              />
             </View>
 
             <Pressable
@@ -440,7 +563,11 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
 
         <CalendarPickerModal
           blockedDates={blockedDates}
-          maximumValue={normalizedPropertyAvailableTo}
+          maximumValue={
+            activeBookingDateField === 'checkOut'
+              ? normalizedPropertyAvailableTo
+              : maximumCheckInDate
+          }
           minimumValue={
             activeBookingDateField === 'checkOut'
               ? minimumCheckOutDate
@@ -853,6 +980,81 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: fonts.medium,
     fontSize: 12,
+  },
+  servicesCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E3DDD7',
+    backgroundColor: '#FBF8F4',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  servicesTitle: {
+    color: colors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 16,
+    marginBottom: 6,
+  },
+  servicesText: {
+    color: '#5B544D',
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: spacing.sm,
+  },
+  servicesStateText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: spacing.sm,
+  },
+  servicesChipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  serviceChip: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#D8CFC5',
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 8,
+  },
+  serviceChipSelected: {
+    borderColor: colors.primary,
+    backgroundColor: '#EEF6F2',
+  },
+  serviceChipText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+  },
+  serviceChipTextSelected: {
+    color: colors.primary,
+    fontFamily: fonts.medium,
+  },
+  serviceNoteLabel: {
+    color: colors.textPrimary,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  serviceNotesInput: {
+    minHeight: 96,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#D8CFC5',
+    backgroundColor: colors.white,
+    color: colors.textPrimary,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    lineHeight: 20,
+    paddingHorizontal: spacing.sm + 4,
+    paddingVertical: spacing.sm + 2,
   },
   stepperRow: {
     flexDirection: 'row',

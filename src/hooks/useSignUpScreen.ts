@@ -3,6 +3,7 @@ import { HeroState, InlineMessage, SubmitState, WelcomeContent } from './useLogi
 import { DashboardVariant } from '../types/appFlow';
 import { setAuthSession } from '../services/authSession';
 import { RentalRole, signUp } from '../services/rentalAuth';
+import {getDashboardVariantForRole} from '../types/appFlow';
 
 const defaultHeroContent: WelcomeContent = {
   greeting: 'Hello, Guest',
@@ -10,7 +11,7 @@ const defaultHeroContent: WelcomeContent = {
   tagline: 'Smart Home Rent Management.',
 };
 
-const signupRoles = ['Tenant', 'Property Owner'];
+const signupRoles = ['Tenant', 'Property Owner', 'Service Provider'];
 
 export const useSignUpScreen = () => {
   const [heroState, setHeroState] = useState<HeroState>({
@@ -27,7 +28,10 @@ export const useSignUpScreen = () => {
   const dashboardVariant: DashboardVariant =
     signupRoleIndex !== null && signupRoles[signupRoleIndex] === 'Property Owner'
       ? 'owner'
-      : 'standard';
+      : signupRoleIndex !== null &&
+          signupRoles[signupRoleIndex] === 'Service Provider'
+        ? 'serviceProvider'
+        : 'standard';
 
   const onRetryHeroPress = () => {
     setHeroState({
@@ -50,7 +54,7 @@ export const useSignUpScreen = () => {
     if (signupRoleIndex === null) {
       setSubmitState('error');
       setInlineMessage({
-        text: 'Please choose whether you are a tenant or property owner.',
+        text: 'Please choose whether you are a tenant, property owner, or service provider.',
         tone: 'error',
       });
       return;
@@ -87,7 +91,11 @@ export const useSignUpScreen = () => {
     setInlineMessage(null);
 
     const role: RentalRole =
-      signupRoles[signupRoleIndex] === 'Property Owner' ? 'owner' : 'tenant';
+      signupRoles[signupRoleIndex] === 'Property Owner'
+        ? 'owner'
+        : signupRoles[signupRoleIndex] === 'Service Provider'
+          ? 'service_provider'
+          : 'tenant';
 
     try {
       const session = await signUp({
@@ -103,7 +111,7 @@ export const useSignUpScreen = () => {
         text: 'Account created successfully.',
         tone: 'success',
       });
-      onSuccess?.(session.user.role === 'owner' ? 'owner' : 'standard');
+      onSuccess?.(getDashboardVariantForRole(session.user.role));
     } catch (error) {
       setSubmitState('error');
       setInlineMessage({

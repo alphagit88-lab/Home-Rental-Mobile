@@ -1,12 +1,19 @@
 import React, {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
 } from 'react';
-import {StyleSheet} from 'react-native';
-import {Region} from 'react-native-maps';
-import {WebView, WebViewMessageEvent} from 'react-native-webview';
+import {Platform, StyleSheet, Text, View} from 'react-native';
+import MapView, {
+  Callout,
+  Circle,
+  MapPressEvent,
+  Marker,
+  PROVIDER_GOOGLE,
+  Region,
+} from 'react-native-maps';
 
 export type OpenStreetMapCoordinate = {
   latitude: number;
@@ -23,6 +30,16 @@ export type OpenStreetMapMarker = {
   title?: string;
 };
 
+export type OpenStreetMapCircle = {
+  description?: string;
+  fillColor?: string;
+  latitude: number;
+  longitude: number;
+  radiusKm: number;
+  strokeColor?: string;
+  title?: string;
+};
+
 export type OpenStreetMapViewHandle = {
   fitToMarkers: () => void;
   zoomIn: () => void;
@@ -30,6 +47,7 @@ export type OpenStreetMapViewHandle = {
 };
 
 type OpenStreetMapViewProps = {
+  circles?: OpenStreetMapCircle[];
   initialSelectedCoordinate?: OpenStreetMapCoordinate | null;
   interactive?: boolean;
   markers: OpenStreetMapMarker[];
@@ -37,368 +55,133 @@ type OpenStreetMapViewProps = {
   region: Region;
 };
 
+const GOOGLE_MAP_PROVIDER =
+  Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined;
+const EDGE_PADDING = {bottom: 40, left: 40, right: 40, top: 40};
+const SINGLE_POINT_DELTA = 0.03;
+
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
-const toJsonScriptValue = (value: unknown) =>
-  JSON.stringify(value)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026');
+const isFiniteCoordinate = (
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): latitude is number =>
+  typeof latitude === 'number' &&
+  typeof longitude === 'number' &&
+  Number.isFinite(latitude) &&
+  Number.isFinite(longitude);
 
-const getZoomLevel = (region: Region) => {
-  const dominantDelta = Math.max(region.latitudeDelta, region.longitudeDelta);
-  const zoomEstimate = Math.round(Math.log2(360 / dominantDelta));
-  return clamp(zoomEstimate, 3, 18);
-};
-
-const buildHtml = (
-  markers: OpenStreetMapMarker[],
-  region: Region,
-  interactive: boolean,
-  initialSelectedCoordinate: OpenStreetMapCoordinate | null,
-  selectionEnabled: boolean,
-) => {
-  const payload = toJsonScriptValue({
-    initialSelectedCoordinate,
-    interactive,
-    markers,
-    region,
-    selectionEnabled,
-    zoom: getZoomLevel(region),
-  });
-
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
-    <style>
-      html,
-      body,
-      #map {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        height: 100%;
-        background: #d7e6e8;
-      }
-
-      body {
-        font-family: Arial, sans-serif;
-      }
-
-      .leaflet-control-attribution {
-        display: none;
-      }
-
-      .leaflet-container {
-        background: #d7e6e8;
-      }
-
-      .property-pin,
-      .selection-pin {
-        align-items: center;
-        border: 2px solid #ffffff;
-        border-radius: 18px;
-        box-shadow: 0 4px 14px rgba(16, 12, 10, 0.24);
-        color: #ffffff;
-        display: flex;
-        font-size: 11px;
-        font-weight: 700;
-        height: 36px;
-        justify-content: center;
-        position: relative;
-        width: 36px;
-      }
-
-      .property-pin {
-        background: #f0b53a;
-      }
-
-      .property-pin.is-highlighted,
-      .selection-pin {
-        background: #3f7765;
-      }
-
-      .property-pin::after,
-      .selection-pin::after {
-        background: #ffffff;
-        border-bottom-left-radius: 2px;
-        border-bottom-right-radius: 2px;
-        bottom: -10px;
-        content: '';
-        height: 10px;
-        left: 50%;
-        position: absolute;
-        transform: translateX(-50%);
-        width: 4px;
-      }
-
-      .selection-pin {
-        transform: scale(1.06);
-      }
-
-      .property-tooltip {
-        background: rgba(25, 21, 19, 0.84);
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 8px 18px rgba(16, 12, 10, 0.22);
-        color: #ffffff;
-        padding: 0;
-      }
-
-      .property-tooltip::before {
-        display: none;
-      }
-
-      .property-tooltip .leaflet-tooltip-content {
-        margin: 0;
-      }
-
-      .property-tooltip-card {
-        max-width: 160px;
-        padding: 8px 10px;
-      }
-
-      .property-tooltip-title {
-        color: #ffffff;
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 14px;
-      }
-
-      .property-tooltip-meta {
-        color: #d7ded8;
-        font-size: 10px;
-        line-height: 12px;
-        margin-top: 2px;
-      }
-
-      .property-popup {
-        min-width: 140px;
-      }
-
-      .property-popup-title {
-        color: #191513;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 16px;
-      }
-
-      .property-popup-meta {
-        color: #625a54;
-        font-size: 12px;
-        line-height: 16px;
-        margin-top: 4px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="map"></div>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-      (function () {
-        const config = ${payload};
-        const map = L.map('map', {
-          attributionControl: false,
-          boxZoom: config.interactive,
-          doubleClickZoom: config.interactive,
-          dragging: config.interactive,
-          keyboard: config.interactive,
-          scrollWheelZoom: config.interactive,
-          touchZoom: config.interactive,
-          zoomControl: false,
-        });
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          subdomains: ['a', 'b', 'c'],
-        }).addTo(map);
-
-        const bounds = [];
-
-        const escapeHtml = (value) =>
-          String(value ?? '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-
-        const buildTooltipHtml = (marker) =>
-          '<div class="property-tooltip-card">' +
-          '<div class="property-tooltip-title">' +
-          escapeHtml(marker.title || marker.indexLabel || 'Property') +
-          '</div>' +
-          (marker.description
-            ? '<div class="property-tooltip-meta">' +
-              escapeHtml(marker.description) +
-              '</div>'
-            : '') +
-          '</div>';
-
-        const buildPopupHtml = (marker) =>
-          '<div class="property-popup">' +
-          '<div class="property-popup-title">' +
-          escapeHtml(marker.title || 'Property') +
-          '</div>' +
-          (marker.description
-            ? '<div class="property-popup-meta">' +
-              escapeHtml(marker.description) +
-              '</div>'
-            : '') +
-          '</div>';
-
-        let selectedMarker = null;
-        const selectionIcon = L.divIcon({
-          className: '',
-          html: '<div class="selection-pin">PIN</div>',
-          iconAnchor: [18, 46],
-          iconSize: [36, 46],
-        });
-
-        const updateSelectedMarker = (coordinate) => {
-          if (!coordinate) {
-            return;
-          }
-
-          const markerPosition = [coordinate.latitude, coordinate.longitude];
-
-          if (!selectedMarker) {
-            selectedMarker = L.marker(markerPosition, {
-              icon: selectionIcon,
-              riseOnHover: true,
-            }).addTo(map);
-            return;
-          }
-
-          selectedMarker.setLatLng(markerPosition);
-        };
-
-        config.markers.forEach((marker) => {
-          const markerIcon = L.divIcon({
-            className: '',
-            html:
-              '<div class="property-pin' +
-              (marker.highlighted ? ' is-highlighted' : '') +
-              '">' +
-              escapeHtml(marker.indexLabel || '*') +
-              '</div>',
-            iconAnchor: [18, 46],
-            iconSize: [36, 46],
-          });
-
-          const mapMarker = L.marker([marker.latitude, marker.longitude], {
-            icon: markerIcon,
-            riseOnHover: true,
-          }).addTo(map);
-
-          mapMarker.bindPopup(buildPopupHtml(marker), {
-            autoPanPadding: [24, 24],
-            closeButton: false,
-          });
-
-          if (marker.showTooltip) {
-            mapMarker.bindTooltip(buildTooltipHtml(marker), {
-              className: 'property-tooltip',
-              direction: 'top',
-              offset: [0, -42],
-              opacity: 1,
-              permanent: true,
-            });
-          }
-
-          bounds.push([marker.latitude, marker.longitude]);
-        });
-
-        if (config.initialSelectedCoordinate) {
-          updateSelectedMarker(config.initialSelectedCoordinate);
-          bounds.push([
-            config.initialSelectedCoordinate.latitude,
-            config.initialSelectedCoordinate.longitude,
-          ]);
-        }
-
-        if (config.interactive && config.selectionEnabled) {
-          map.on('click', function (event) {
-            const coordinate = {
-              latitude: Number(event.latlng.lat.toFixed(6)),
-              longitude: Number(event.latlng.lng.toFixed(6)),
-            };
-
-            updateSelectedMarker(coordinate);
-
-            if (window.ReactNativeWebView) {
-              window.ReactNativeWebView.postMessage(
-                JSON.stringify({
-                  coordinate: coordinate,
-                  type: 'mapPress',
-                })
-              );
-            }
-          });
-        }
-
-        const focusMarkers = (animated) => {
-          if (bounds.length === 0) {
-            map.setView(
-              [config.region.latitude, config.region.longitude],
-              config.zoom,
-              {animate: animated}
-            );
-            return;
-          }
-
-          if (bounds.length === 1) {
-            map.setView(bounds[0], Math.max(config.zoom, 15), {
-              animate: animated,
-            });
-            return;
-          }
-
-          map.fitBounds(bounds, {
-            animate: animated,
-            maxZoom: 16,
-            padding: [40, 40],
-          });
-        };
-
-        focusMarkers(false);
-        window.__openStreetMapView = {
-          focusMarkers,
-          zoomIn: function () {
-            map.zoomIn();
-          },
-          zoomOut: function () {
-            map.zoomOut();
-          },
-        };
-      })();
-    </script>
-  </body>
-</html>`;
-};
-
-const runMapCommand = (
-  webView: WebView | null,
-  type: 'focusMarkers' | 'zoomIn' | 'zoomOut',
-) => {
-  if (!webView) {
-    return;
+const createCircleFitCoordinates = (
+  circle: OpenStreetMapCircle,
+): OpenStreetMapCoordinate[] => {
+  if (
+    !isFiniteCoordinate(circle.latitude, circle.longitude) ||
+    !Number.isFinite(circle.radiusKm) ||
+    circle.radiusKm <= 0
+  ) {
+    return [];
   }
 
-  webView.injectJavaScript(
-    `window.__openStreetMapView && window.__openStreetMapView.${type}(); true;`,
-  );
+  const latitudeOffset = circle.radiusKm / 111.32;
+  const longitudeOffset =
+    circle.radiusKm /
+    (111.32 * Math.max(Math.abs(Math.cos((circle.latitude * Math.PI) / 180)), 0.2));
+
+  return [
+    {latitude: circle.latitude, longitude: circle.longitude},
+    {
+      latitude: circle.latitude + latitudeOffset,
+      longitude: circle.longitude,
+    },
+    {
+      latitude: circle.latitude - latitudeOffset,
+      longitude: circle.longitude,
+    },
+    {
+      latitude: circle.latitude,
+      longitude: circle.longitude + longitudeOffset,
+    },
+    {
+      latitude: circle.latitude,
+      longitude: circle.longitude - longitudeOffset,
+    },
+  ];
 };
+
+const buildFitCoordinates = (
+  markers: OpenStreetMapMarker[],
+  circles: OpenStreetMapCircle[],
+  initialSelectedCoordinate: OpenStreetMapCoordinate | null,
+) => {
+  const coordinates: OpenStreetMapCoordinate[] = [];
+
+  markers.forEach(marker => {
+    if (isFiniteCoordinate(marker.latitude, marker.longitude)) {
+      coordinates.push({
+        latitude: marker.latitude,
+        longitude: marker.longitude,
+      });
+    }
+  });
+
+  circles.forEach(circle => {
+    coordinates.push(...createCircleFitCoordinates(circle));
+  });
+
+  if (
+    initialSelectedCoordinate &&
+    isFiniteCoordinate(
+      initialSelectedCoordinate.latitude,
+      initialSelectedCoordinate.longitude,
+    )
+  ) {
+    coordinates.push(initialSelectedCoordinate);
+  }
+
+  return coordinates;
+};
+
+const createSinglePointRegion = (
+  coordinate: OpenStreetMapCoordinate,
+  fallbackRegion: Region,
+): Region => ({
+  latitude: coordinate.latitude,
+  latitudeDelta: Math.min(fallbackRegion.latitudeDelta, SINGLE_POINT_DELTA),
+  longitude: coordinate.longitude,
+  longitudeDelta: Math.min(fallbackRegion.longitudeDelta, SINGLE_POINT_DELTA),
+});
+
+const createZoomedRegion = (region: Region, factor: number): Region => ({
+  latitude: region.latitude,
+  latitudeDelta: clamp(region.latitudeDelta * factor, 0.002, 80),
+  longitude: region.longitude,
+  longitudeDelta: clamp(region.longitudeDelta * factor, 0.002, 80),
+});
+
+const MarkerPin: React.FC<{
+  highlighted?: boolean;
+  label: string;
+  selected?: boolean;
+}> = ({highlighted = false, label, selected = false}) => (
+  <View style={styles.pinWrap}>
+    <View
+      style={[
+        styles.pinBody,
+        highlighted ? styles.pinBodyHighlighted : styles.pinBodyDefault,
+        selected ? styles.pinBodySelected : null,
+      ]}>
+      <Text style={styles.pinLabel}>{label}</Text>
+    </View>
+    <View
+      style={[
+        styles.pinTail,
+        highlighted ? styles.pinTailHighlighted : styles.pinTailDefault,
+        selected ? styles.pinTailSelected : null,
+      ]}
+    />
+  </View>
+);
 
 export const OpenStreetMapView = forwardRef<
   OpenStreetMapViewHandle,
@@ -406,6 +189,7 @@ export const OpenStreetMapView = forwardRef<
 >(
   (
     {
+      circles = [],
       initialSelectedCoordinate = null,
       interactive = true,
       markers,
@@ -414,82 +198,305 @@ export const OpenStreetMapView = forwardRef<
     },
     ref,
   ) => {
-    const webViewRef = useRef<WebView | null>(null);
-    const selectionEnabled = Boolean(onMapPress);
-    const sourceHtml = useMemo(
-      () =>
-        buildHtml(
-          markers,
-          region,
-          interactive,
-          initialSelectedCoordinate,
-          selectionEnabled,
-        ),
-      [
-        initialSelectedCoordinate,
-        interactive,
-        markers,
-        region,
-        selectionEnabled,
-      ],
+    const mapRef = useRef<MapView | null>(null);
+    const mapReadyRef = useRef(false);
+    const fitCoordinates = useMemo(
+      () => buildFitCoordinates(markers, circles, initialSelectedCoordinate),
+      [circles, initialSelectedCoordinate, markers],
     );
+    const fitCoordinatesRef = useRef<OpenStreetMapCoordinate[]>(fitCoordinates);
+    const lastKnownRegionRef = useRef(region);
+    const selectionEnabled = Boolean(onMapPress);
+
+    fitCoordinatesRef.current = fitCoordinates;
+
+    useEffect(() => {
+      lastKnownRegionRef.current = region;
+
+      if (!mapReadyRef.current || fitCoordinates.length > 0) {
+        return;
+      }
+
+      mapRef.current?.animateToRegion(region, 250);
+    }, [fitCoordinates.length, region]);
+
+    useEffect(() => {
+      if (!mapReadyRef.current) {
+        return;
+      }
+
+      const coordinates = fitCoordinatesRef.current;
+      const fallbackRegion = lastKnownRegionRef.current;
+
+      if (coordinates.length === 0) {
+        mapRef.current?.animateToRegion(fallbackRegion, 250);
+        return;
+      }
+
+      if (coordinates.length === 1) {
+        mapRef.current?.animateToRegion(
+          createSinglePointRegion(coordinates[0], fallbackRegion),
+          250,
+        );
+        return;
+      }
+
+      mapRef.current?.fitToCoordinates(coordinates, {
+        animated: true,
+        edgePadding: EDGE_PADDING,
+      });
+    }, [fitCoordinates]);
 
     useImperativeHandle(
       ref,
       () => ({
-        fitToMarkers: () => runMapCommand(webViewRef.current, 'focusMarkers'),
-        zoomIn: () => runMapCommand(webViewRef.current, 'zoomIn'),
-        zoomOut: () => runMapCommand(webViewRef.current, 'zoomOut'),
+        fitToMarkers: () => {
+          const coordinates = fitCoordinatesRef.current;
+          const fallbackRegion = lastKnownRegionRef.current;
+
+          if (!mapReadyRef.current) {
+            return;
+          }
+
+          if (coordinates.length === 0) {
+            mapRef.current?.animateToRegion(fallbackRegion, 250);
+            return;
+          }
+
+          if (coordinates.length === 1) {
+            mapRef.current?.animateToRegion(
+              createSinglePointRegion(coordinates[0], fallbackRegion),
+              250,
+            );
+            return;
+          }
+
+          mapRef.current?.fitToCoordinates(coordinates, {
+            animated: true,
+            edgePadding: EDGE_PADDING,
+          });
+        },
+        zoomIn: () => {
+          if (!mapReadyRef.current) {
+            return;
+          }
+
+          const nextRegion = createZoomedRegion(lastKnownRegionRef.current, 0.5);
+          lastKnownRegionRef.current = nextRegion;
+          mapRef.current?.animateToRegion(nextRegion, 250);
+        },
+        zoomOut: () => {
+          if (!mapReadyRef.current) {
+            return;
+          }
+
+          const nextRegion = createZoomedRegion(lastKnownRegionRef.current, 2);
+          lastKnownRegionRef.current = nextRegion;
+          mapRef.current?.animateToRegion(nextRegion, 250);
+        },
       }),
       [],
     );
 
-    const handleMessage = (event: WebViewMessageEvent) => {
+    const handleMapPress = (event: MapPressEvent) => {
       if (!onMapPress) {
         return;
       }
 
-      try {
-        const payload = JSON.parse(event.nativeEvent.data) as {
-          coordinate?: OpenStreetMapCoordinate;
-          type?: string;
-        };
-
-        if (
-          payload.type === 'mapPress' &&
-          payload.coordinate &&
-          Number.isFinite(payload.coordinate.latitude) &&
-          Number.isFinite(payload.coordinate.longitude)
-        ) {
-          onMapPress(payload.coordinate);
-        }
-      } catch (error) {
-        return;
-      }
+      onMapPress(event.nativeEvent.coordinate);
     };
 
     return (
-      <WebView
-        bounces={false}
-        domStorageEnabled
-        javaScriptEnabled
-        onMessage={selectionEnabled ? handleMessage : undefined}
-        originWhitelist={['*']}
-        ref={refValue => {
-          webViewRef.current = refValue;
+      <MapView
+        initialRegion={region}
+        onMapReady={() => {
+          mapReadyRef.current = true;
+
+          const coordinates = fitCoordinatesRef.current;
+          const fallbackRegion = lastKnownRegionRef.current;
+
+          if (coordinates.length === 0) {
+            mapRef.current?.animateToRegion(fallbackRegion, 0);
+            return;
+          }
+
+          if (coordinates.length === 1) {
+            mapRef.current?.animateToRegion(
+              createSinglePointRegion(coordinates[0], fallbackRegion),
+              0,
+            );
+            return;
+          }
+
+          mapRef.current?.fitToCoordinates(coordinates, {
+            animated: false,
+            edgePadding: EDGE_PADDING,
+          });
         }}
-        scrollEnabled={false}
-        setSupportMultipleWindows={false}
-        source={{html: sourceHtml}}
-        style={styles.webView}
-      />
+        onPress={selectionEnabled ? handleMapPress : undefined}
+        onRegionChangeComplete={nextRegion => {
+          lastKnownRegionRef.current = nextRegion;
+        }}
+        pitchEnabled={interactive}
+        provider={GOOGLE_MAP_PROVIDER}
+        ref={refValue => {
+          mapRef.current = refValue;
+        }}
+        rotateEnabled={interactive}
+        scrollEnabled={interactive}
+        showsCompass={false}
+        showsMyLocationButton={false}
+        showsScale={false}
+        style={styles.map}
+        toolbarEnabled={false}
+        zoomEnabled={interactive}>
+        {circles.map((circle, index) => {
+          if (
+            !isFiniteCoordinate(circle.latitude, circle.longitude) ||
+            !Number.isFinite(circle.radiusKm) ||
+            circle.radiusKm <= 0
+          ) {
+            return null;
+          }
+
+          return (
+            <Circle
+              center={{
+                latitude: circle.latitude,
+                longitude: circle.longitude,
+              }}
+              fillColor={circle.fillColor ?? 'rgba(47, 125, 96, 0.15)'}
+              key={`circle-${circle.latitude}-${circle.longitude}-${index}`}
+              radius={circle.radiusKm * 1000}
+              strokeColor={circle.strokeColor ?? '#2F7D60'}
+              strokeWidth={2}
+            />
+          );
+        })}
+
+        {markers.map((marker, index) => {
+          if (!isFiniteCoordinate(marker.latitude, marker.longitude)) {
+            return null;
+          }
+
+          return (
+            <Marker
+              anchor={{x: 0.5, y: 1}}
+              coordinate={{
+                latitude: marker.latitude,
+                longitude: marker.longitude,
+              }}
+              description={marker.description}
+              key={`marker-${marker.latitude}-${marker.longitude}-${index}`}
+              title={marker.title}>
+              <MarkerPin
+                highlighted={marker.highlighted}
+                label={marker.indexLabel || '*'}
+              />
+              {marker.showTooltip ? (
+                <Callout tooltip>
+                  <View style={styles.calloutCard}>
+                    <Text style={styles.calloutTitle}>
+                      {marker.title || marker.indexLabel || 'Location'}
+                    </Text>
+                    {marker.description ? (
+                      <Text style={styles.calloutDescription}>
+                        {marker.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                </Callout>
+              ) : null}
+            </Marker>
+          );
+        })}
+
+        {initialSelectedCoordinate &&
+        isFiniteCoordinate(
+          initialSelectedCoordinate.latitude,
+          initialSelectedCoordinate.longitude,
+        ) ? (
+          <Marker
+            anchor={{x: 0.5, y: 1}}
+            coordinate={initialSelectedCoordinate}
+            title="Selected location">
+            <MarkerPin label="PIN" selected />
+          </Marker>
+        ) : null}
+      </MapView>
     );
   },
 );
 
 const styles = StyleSheet.create({
-  webView: {
+  map: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
+  },
+  pinWrap: {
+    alignItems: 'center',
+  },
+  pinBody: {
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    height: 36,
+    justifyContent: 'center',
+    minWidth: 36,
+    paddingHorizontal: 8,
+    shadowColor: '#000000',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.22,
+    shadowRadius: 7,
+    elevation: 5,
+  },
+  pinBodyDefault: {
+    backgroundColor: '#F0B53A',
+  },
+  pinBodyHighlighted: {
+    backgroundColor: '#3F7765',
+  },
+  pinBodySelected: {
+    backgroundColor: '#3F7765',
+    minWidth: 44,
+  },
+  pinLabel: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pinTail: {
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    height: 10,
+    marginTop: -1,
+    width: 4,
+  },
+  pinTailDefault: {
+    backgroundColor: '#F0B53A',
+  },
+  pinTailHighlighted: {
+    backgroundColor: '#3F7765',
+  },
+  pinTailSelected: {
+    backgroundColor: '#3F7765',
+  },
+  calloutCard: {
+    maxWidth: 220,
+    borderRadius: 12,
+    backgroundColor: 'rgba(25, 21, 19, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  calloutTitle: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  calloutDescription: {
+    color: '#DDD5CE',
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

@@ -1,3 +1,4 @@
+import {addDaysToIsoDate} from './bookingCalendar';
 import {normalizeDateString} from './dateInput';
 
 const formatDateLabel = (value: string) => {
@@ -29,6 +30,42 @@ const formatMoneyValue = (value: number) => {
   return decimalPart === '00'
     ? wholeWithCommas
     : `${wholeWithCommas}.${decimalPart}`;
+};
+
+export const getLatestPropertyCheckInDate = (availableTo: string | null) => {
+  const normalizedAvailableTo = normalizeDateString(availableTo);
+
+  if (!normalizedAvailableTo) {
+    return null;
+  }
+
+  return addDaysToIsoDate(normalizedAvailableTo, -1);
+};
+
+export const hasPropertyBookableStayDates = (
+  availableFrom: string | null,
+  availableTo: string | null,
+  referenceDate: string,
+) => {
+  const normalizedReferenceDate = normalizeDateString(referenceDate);
+
+  if (!normalizedReferenceDate) {
+    return true;
+  }
+
+  const normalizedAvailableFrom = normalizeDateString(availableFrom);
+  const latestCheckInDate = getLatestPropertyCheckInDate(availableTo);
+
+  if (!latestCheckInDate) {
+    return true;
+  }
+
+  const firstBookableCheckInDate =
+    normalizedAvailableFrom && normalizedAvailableFrom > normalizedReferenceDate
+      ? normalizedAvailableFrom
+      : normalizedReferenceDate;
+
+  return firstBookableCheckInDate <= latestCheckInDate;
 };
 
 export const formatPropertyRent = (monthlyRent: number | null) =>

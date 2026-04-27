@@ -18,6 +18,7 @@ import { useResponsive } from '../hooks/useResponsive';
 import { getAuthSession, updateAuthSessionUser } from '../services/authSession';
 import { updateProfile } from '../services/rentalAuth';
 import { colors, fonts, radii, spacing } from '../theme';
+import {formatRentalRoleLabel} from '../types/appFlow';
 import HideIcon from '../assets/images/hide.svg';
 import LockIcon from '../assets/images/Lock.svg';
 import MessageIcon from '../assets/images/Message.svg';
@@ -214,7 +215,7 @@ export const EditProfileScreen: React.FC<EditProfileScreenProps> = ({
               <View style={styles.roleBadge}>
                 <Text style={styles.roleBadgeLabel}>Role</Text>
                 <Text style={styles.roleBadgeValue}>
-                  {session?.user.role === 'owner' ? 'Property Owner' : 'Tenant'}
+                  {formatRentalRoleLabel(session?.user.role)}
                 </Text>
               </View>
 

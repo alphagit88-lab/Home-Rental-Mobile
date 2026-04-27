@@ -1,4 +1,5 @@
 import {normalizeDateString} from './dateInput';
+import {RentalServiceRequestRecord} from '../types/rentalService';
 
 const formatMoneyValue = (value: number) => {
   const fixedValue = value.toFixed(2);
@@ -72,4 +73,28 @@ export const formatBookingStatusLabel = (value?: string | null) => {
     .filter(Boolean)
     .map(segment => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(' ');
+};
+
+export const formatBookingServiceRequestSummary = (
+  serviceRequests: RentalServiceRequestRecord[] = [],
+) => {
+  if (serviceRequests.length === 0) {
+    return 'No extra services';
+  }
+
+  const categoryNames = Array.from(
+    new Set(
+      serviceRequests
+        .map(serviceRequest => serviceRequest.serviceCategoryName.trim())
+        .filter(name => name.length > 0),
+    ),
+  );
+
+  if (categoryNames.length === 0) {
+    return `${serviceRequests.length} service request${
+      serviceRequests.length === 1 ? '' : 's'
+    }`;
+  }
+
+  return categoryNames.join(', ');
 };

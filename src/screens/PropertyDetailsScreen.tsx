@@ -18,8 +18,10 @@ import {PropertyMapCard} from '../components/PropertyMapCard';
 import {useResponsive} from '../hooks/useResponsive';
 import {PropertyRecord} from '../services/properties';
 import {colors, fonts, spacing} from '../theme';
+import {formatIsoDateInput} from '../utils/dateInput';
 import {
   formatPropertyAvailability,
+  hasPropertyBookableStayDates,
   formatPropertyRent,
 } from '../utils/propertyPresentation';
 
@@ -50,6 +52,17 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
   const description =
     property.description ||
     `${property.propertyType} in ${property.locationText || 'your selected area'}.`;
+  const currentDate = new Date();
+  const todayIsoDate = formatIsoDateInput(
+    `${String(currentDate.getFullYear()).padStart(4, '0')}-${String(
+      currentDate.getMonth() + 1,
+    ).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`,
+  );
+  const isBookable = hasPropertyBookableStayDates(
+    property.availableFrom,
+    property.availableTo,
+    todayIsoDate,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -144,9 +157,15 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
 
               <Pressable
                 accessibilityRole="button"
+                disabled={!isBookable}
                 onPress={onBookNow}
-                style={styles.bookButton}>
-                <Text style={styles.bookButtonText}>BOOK NOW</Text>
+                style={[
+                  styles.bookButton,
+                  !isBookable ? styles.bookButtonDisabled : null,
+                ]}>
+                <Text style={styles.bookButtonText}>
+                  {isBookable ? 'BOOK NOW' : 'NOT AVAILABLE'}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -343,6 +362,11 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: {width: 0, height: 8},
     elevation: 6,
+  },
+  bookButtonDisabled: {
+    backgroundColor: '#C8C3BD',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   bookButtonText: {
     color: colors.white,

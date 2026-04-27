@@ -1,5 +1,9 @@
 import {normalizeDateString} from '../utils/dateInput';
 import {iterateStayDates} from '../utils/bookingCalendar';
+import {
+  normalizeRentalServiceRequest,
+} from './rentalServiceRequests';
+import {RentalServiceRequestRecord} from '../types/rentalService';
 import {API_BASE_URL} from './rentalAuth';
 
 type ApiEnvelope<T> = {
@@ -36,6 +40,7 @@ export type BookingRecord = {
   propertyId: number;
   propertyLocationText: string;
   propertyTitle: string;
+  serviceRequests: RentalServiceRequestRecord[];
   tenantEmail: string | null;
   tenantId: number;
   tenantName: string | null;
@@ -61,6 +66,8 @@ export type CreateBookingParams = {
   paymentMethod?: string | null;
   paymentReference?: string | null;
   propertyId: number;
+  serviceCategoryIds?: number[];
+  serviceNotes?: string | null;
 };
 
 type QueryOptions = {
@@ -190,6 +197,17 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
     booking.owner && typeof booking.owner === 'object'
       ? (booking.owner as Record<string, unknown>)
       : null;
+  const serviceRequestsSource = Array.isArray(
+    booking.serviceRequests ?? booking.service_requests,
+  )
+    ? ((booking.serviceRequests ?? booking.service_requests) as unknown[])
+    : [];
+  const serviceRequests = serviceRequestsSource
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object',
+    )
+    .map(normalizeRentalServiceRequest);
 
   return {
     bookingCode: String(
@@ -262,6 +280,7 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
         booking.title ??
         'Untitled Property',
     ),
+    serviceRequests,
     tenantEmail: toNullableString(
       booking.tenantEmail ?? booking.tenant_email ?? tenant?.email,
     ),
@@ -445,7 +464,11 @@ export const createBooking = async (
     token,
     {
       method: 'POST',
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        ...params,
+        serviceCategoryIds: params.serviceCategoryIds ?? [],
+        serviceNotes: params.serviceNotes ?? null,
+      }),
     },
     'Unable to create your booking.',
   );

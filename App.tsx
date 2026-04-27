@@ -12,11 +12,14 @@ import {OwnerHomeScreen} from './src/screens/OwnerHomeScreen';
 import {OwnerPropertyDetailsScreen} from './src/screens/OwnerPropertyDetailsScreen';
 import {OwnerPropertiesScreen} from './src/screens/OwnerPropertiesScreen';
 import {PropertiesScreen} from './src/screens/PropertiesScreen';
+import {ServiceProviderHomeScreen} from './src/screens/ServiceProviderHomeScreen';
+import {ServiceProviderMapScreen} from './src/screens/ServiceProviderMapScreen';
+import {ServiceProviderRequestsScreen} from './src/screens/ServiceProviderRequestsScreen';
 import {clearAuthSession, restoreAuthSession} from './src/services/authSession';
 import {PropertyRecord} from './src/services/properties';
 import {SignUpScreen} from './src/screens/SignUpScreen';
 import {colors} from './src/theme';
-import {DashboardVariant} from './src/types/appFlow';
+import {DashboardVariant, getDashboardVariantForRole} from './src/types/appFlow';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'loading' | 'login' | 'signup' | 'home'>(
@@ -53,7 +56,7 @@ const App: React.FC = () => {
         }
 
         if (session) {
-          setDashboardVariant(session.user.role === 'owner' ? 'owner' : 'standard');
+          setDashboardVariant(getDashboardVariantForRole(session.user.role));
           setAccountView('list');
           setOwnerPropertiesView('list');
           setSelectedOwnerProperty(null);
@@ -99,6 +102,15 @@ const App: React.FC = () => {
 
   if (screen === 'home') {
     if (activeTab === 'properties') {
+      if (dashboardVariant === 'serviceProvider') {
+        return (
+          <ServiceProviderMapScreen
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        );
+      }
+
       if (dashboardVariant === 'owner') {
         if (ownerPropertiesView === 'create') {
           return (
@@ -160,6 +172,15 @@ const App: React.FC = () => {
     }
 
     if (activeTab === 'bookings') {
+      if (dashboardVariant === 'serviceProvider') {
+        return (
+          <ServiceProviderRequestsScreen
+            activeTab={activeTab}
+            onTabPress={handleTabPress}
+          />
+        );
+      }
+
       if (dashboardVariant === 'owner') {
         return (
           <OwnerBookingsScreen
@@ -203,6 +224,15 @@ const App: React.FC = () => {
             setActiveTab('dashboard');
             setScreen('login');
           }}
+          onTabPress={handleTabPress}
+        />
+      );
+    }
+
+    if (dashboardVariant === 'serviceProvider') {
+      return (
+        <ServiceProviderHomeScreen
+          activeTab={activeTab}
           onTabPress={handleTabPress}
         />
       );

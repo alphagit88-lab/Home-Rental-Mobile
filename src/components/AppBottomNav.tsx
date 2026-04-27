@@ -10,11 +10,13 @@ export type AppTab = 'dashboard' | 'properties' | 'bookings' | 'account';
 
 type AppBottomNavProps = {
   activeTab: AppTab;
+  labels?: Partial<Record<AppTab, string>>;
   onTabPress: (tab: AppTab) => void;
 };
 
 export const AppBottomNav: React.FC<AppBottomNavProps> = ({
   activeTab,
+  labels,
   onTabPress,
 }) => {
   return (
@@ -22,25 +24,25 @@ export const AppBottomNav: React.FC<AppBottomNavProps> = ({
       <BottomNavItem
         active={activeTab === 'dashboard'}
         icon={<DashboardIcon height={22} width={22} />}
-        label="Dashboard"
+        label={labels?.dashboard ?? 'Dashboard'}
         onPress={() => onTabPress('dashboard')}
       />
       <BottomNavItem
         active={activeTab === 'properties'}
         icon={<PropertiesIcon height={22} width={22} />}
-        label="Properties"
+        label={labels?.properties ?? 'Properties'}
         onPress={() => onTabPress('properties')}
       />
       <BottomNavItem
         active={activeTab === 'bookings'}
         icon={<BookingsIcon height={22} width={22} />}
-        label="Bookings"
+        label={labels?.bookings ?? 'Bookings'}
         onPress={() => onTabPress('bookings')}
       />
       <BottomNavItem
         active={activeTab === 'account'}
         icon={<AccountIcon height={22} width={22} />}
-        label="Account"
+        label={labels?.account ?? 'Account'}
         onPress={() => onTabPress('account')}
       />
     </View>

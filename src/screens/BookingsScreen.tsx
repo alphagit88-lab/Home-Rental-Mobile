@@ -24,6 +24,7 @@ import {
   formatBookingDateLabel,
   formatBookingMoney,
   formatBookingRange,
+  formatBookingServiceRequestSummary,
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
 
@@ -135,6 +136,9 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
                       booking.checkIn,
                       booking.checkOut,
                     )}
+                    serviceSummary={formatBookingServiceRequestSummary(
+                      booking.serviceRequests,
+                    )}
                     title={booking.propertyTitle}
                   />
                 ))}
@@ -154,6 +158,7 @@ type BookingCardProps = {
   footerValue: string;
   metaPrimary: string;
   metaSecondary: string;
+  serviceSummary: string;
   title: string;
 };
 
@@ -162,6 +167,7 @@ const BookingCard: React.FC<BookingCardProps> = ({
   footerValue,
   metaPrimary,
   metaSecondary,
+  serviceSummary,
   title,
 }) => {
   return (
@@ -190,6 +196,9 @@ const BookingCard: React.FC<BookingCardProps> = ({
 
         <Text style={styles.bookedOnText}>
           Booked on : <Text style={styles.bookedOnStrong}>{bookedOn}</Text>
+        </Text>
+        <Text numberOfLines={1} style={styles.servicesText}>
+          Services : <Text style={styles.bookedOnStrong}>{serviceSummary}</Text>
         </Text>
 
         <View style={styles.bookingFooter}>
@@ -377,10 +386,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: fonts.regular,
     fontSize: 12,
-    marginBottom: 6,
+    marginBottom: 2,
   },
   bookedOnStrong: {
     fontFamily: fonts.bold,
+  },
+  servicesText: {
+    color: '#6F675F',
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    marginBottom: 6,
   },
   bookingFooter: {
     flexDirection: 'row',

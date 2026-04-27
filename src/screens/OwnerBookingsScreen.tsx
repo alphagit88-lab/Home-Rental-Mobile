@@ -28,6 +28,7 @@ import {
 import {
   formatBookingDateLabel,
   formatBookingRange,
+  formatBookingServiceRequestSummary,
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
 import MenuIcon from '../assets/images/menu 1.svg';
@@ -422,6 +423,8 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
                       )} | ${booking.tenantName ?? 'Tenant'} | ${formatBookingRange(
                         booking.checkIn,
                         booking.checkOut,
+                      )} | ${formatBookingServiceRequestSummary(
+                        booking.serviceRequests,
                       )}`}
                       title={booking.propertyTitle}
                       trailingLabel={formatBookingDateLabel(booking.createdAt)}

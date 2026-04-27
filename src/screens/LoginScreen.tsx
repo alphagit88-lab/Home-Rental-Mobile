@@ -106,6 +106,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                     label="Property Owner"
                     onPress={() => login.setDashboardVariant('owner')}
                   />
+                  <AuthPathButton
+                    active={login.dashboardVariant === 'serviceProvider'}
+                    label="Service Provider"
+                    onPress={() => login.setDashboardVariant('serviceProvider')}
+                  />
                 </View>
 
                 <View style={styles.fields}>
@@ -309,7 +314,8 @@ const styles = StyleSheet.create({
   pathButtonText: {
     color: colors.textPrimary,
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 15,
     textAlign: 'center',
   },
   pathButtonTextActive: {

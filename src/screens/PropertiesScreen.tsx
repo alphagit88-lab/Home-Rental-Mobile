@@ -42,6 +42,7 @@ import {
 } from '../utils/propertyAmenities';
 import {
   formatPropertyAvailabilityChip,
+  hasPropertyBookableStayDates,
   formatPropertyRentCompact,
 } from '../utils/propertyPresentation';
 import {PropertyBookingScreen} from './PropertyBookingScreen';
@@ -98,6 +99,9 @@ const createBookingDraft = (): PropertyBookingDraft => ({
   checkIn: '',
   checkOut: '',
   guestCount: 1,
+  serviceCategoryIds: [],
+  serviceCategoryNames: [],
+  serviceNotes: '',
 });
 
 const uniqueValues = (values: string[]) =>
@@ -273,12 +277,21 @@ const getFooterDetails = (property: PropertyRecord) =>
     ? {label: 'code', value: property.propertyCode}
     : {label: 'rent', value: formatPropertyRentCompact(property.monthlyRent)};
 
-const getAvailabilityTagLabel = (property: PropertyRecord) =>
-  formatPropertyAvailabilityChip(
+const getAvailabilityTagLabel = (
+  property: PropertyRecord,
+  referenceDate: string,
+) =>
+  hasPropertyBookableStayDates(
     property.availableFrom,
     property.availableTo,
-    property.listingType,
-  );
+    referenceDate,
+  )
+    ? formatPropertyAvailabilityChip(
+        property.availableFrom,
+        property.availableTo,
+        property.listingType,
+      )
+    : 'Not available';
 
 const getAmenityIcon = (key: AmenityOptionKey) => {
   if (key === 'parking') {
@@ -490,6 +503,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
 
   const openPropertyDetails = (property: PropertyRecord) => {
     setSelectedProperty(property);
+    setBookingDraft(createBookingDraft());
     setDetailVisible(true);
   };
 
@@ -525,6 +539,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             guestCount: bookingDraft.guestCount,
             paymentMethod: 'card',
             propertyId: selectedProperty.id,
+            serviceCategoryIds: bookingDraft.serviceCategoryIds,
+            serviceNotes: bookingDraft.serviceNotes.trim() || null,
           });
 
           setBookingDraft(createBookingDraft());
@@ -651,9 +667,15 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
               <View style={styles.cardList}>
                 {visibleProperties.map(property => {
                   const footerDetails = getFooterDetails(property);
+                  const isBookable = hasPropertyBookableStayDates(
+                    property.availableFrom,
+                    property.availableTo,
+                    todayIsoDate,
+                  );
 
                   return (
                     <PropertyCard
+                      availabilityInactive={!isBookable}
                       baths={`${property.bathrooms} bath`}
                       bedrooms={`${property.bedrooms} bedroom`}
                       facilityKeys={getAmenityOptionKeys(property.amenities)}
@@ -662,7 +684,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
                       key={property.id}
                       meta={getMetaText(property)}
                       onAvailabilityPress={() => openPropertyDetails(property)}
-                      tag={getAvailabilityTagLabel(property)}
+                      tag={getAvailabilityTagLabel(property, todayIsoDate)}
                       title={property.title}
                     />
                   );
@@ -1132,6 +1154,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
 };
 
 type PropertyCardProps = {
+  availabilityInactive?: boolean;
   baths: string;
   bedrooms: string;
   facilityKeys: AmenityOptionKey[];
@@ -1144,6 +1167,7 @@ type PropertyCardProps = {
 };
 
 const PropertyCard: React.FC<PropertyCardProps> = ({
+  availabilityInactive,
   baths,
   bedrooms,
   facilityKeys,
@@ -1187,8 +1211,16 @@ const PropertyCard: React.FC<PropertyCardProps> = ({
         <Pressable
           accessibilityRole="button"
           onPress={onAvailabilityPress}
-          style={styles.availabilityChip}>
-          <Text numberOfLines={1} style={styles.availabilityText}>
+          style={[
+            styles.availabilityChip,
+            availabilityInactive ? styles.availabilityChipInactive : null,
+          ]}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.availabilityText,
+              availabilityInactive ? styles.availabilityTextInactive : null,
+            ]}>
             {tag}
           </Text>
         </Pressable>
@@ -1912,10 +1944,16 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     marginBottom: spacing.sm,
   },
+  availabilityChipInactive: {
+    backgroundColor: '#E7E1DB',
+  },
   availabilityText: {
     color: colors.white,
     fontFamily: fonts.medium,
     fontSize: 13,
+  },
+  availabilityTextInactive: {
+    color: '#6A625A',
   },
   propertyPrice: {
     color: colors.textPrimary,

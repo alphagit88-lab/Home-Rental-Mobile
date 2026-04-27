@@ -1,6 +1,6 @@
 import {Platform} from 'react-native';
 
-export type RentalRole = 'tenant' | 'owner';
+export type RentalRole = 'tenant' | 'owner' | 'service_provider';
 type BackendTarget = 'cloudflare' | 'local';
 
 export type AuthUser = {
@@ -43,7 +43,7 @@ type UpdateProfileParams = {
 };
 
 // Switch this between 'local' and 'cloudflare' depending on what you want to test.
-const API_BACKEND_TARGET: BackendTarget = 'local';
+const API_BACKEND_TARGET: BackendTarget = 'cloudflare';
 const CLOUDFLARE_API_BASE_URL =
   'https://regulation-energy-carl-cedar.trycloudflare.com/';
 
