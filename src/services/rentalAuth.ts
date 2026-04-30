@@ -45,7 +45,7 @@ type UpdateProfileParams = {
 // Switch this between 'local' and 'cloudflare' depending on what you want to test.
 const API_BACKEND_TARGET: BackendTarget = 'cloudflare';
 const CLOUDFLARE_API_BASE_URL =
-  'https://regulation-energy-carl-cedar.trycloudflare.com/';
+  'https://depends-privileges-attention-improving.trycloudflare.com/';
 
 // Use your machine LAN IP for testing from a physical device on the same network.
 const LOCAL_MANUAL_API_BASE_URL = 'http://192.168.1.103:5001';

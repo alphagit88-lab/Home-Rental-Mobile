@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Platform,
   Pressable,
@@ -13,6 +13,7 @@ import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useOwnerBookings} from '../hooks/useOwnerBookings';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
+import {BookingRecord} from '../services/bookings';
 import {colors, fonts, radii, spacing} from '../theme';
 import {
   addDaysToIsoDate,
@@ -27,10 +28,12 @@ import {
 } from '../utils/bookingCalendar';
 import {
   formatBookingDateLabel,
+  formatBookingPaymentStatusLabel,
   formatBookingRange,
   formatBookingServiceRequestSummary,
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
+import {BookingDetailsScreen} from './BookingDetailsScreen';
 import MenuIcon from '../assets/images/menu 1.svg';
 import ProfilePic from '../assets/images/profile_pic.svg';
 import PlayIcon from '../assets/images/20 1.svg';
@@ -80,6 +83,10 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
     loading,
     reload,
   } = useOwnerBookings({from: queryFrom, to: queryTo});
+  const [bookingOverrides, setBookingOverrides] = useState<
+    Record<number, BookingRecord>
+  >({});
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
   const selectedMonthStart = getStartOfMonthIsoDate(selectedYear, selectedMonthIndex);
   const selectedMonthEnd = getEndOfMonthIsoDate(selectedYear, selectedMonthIndex);
   const last8DaysStart = addDaysToIsoDate(todayIsoDate, -7) ?? todayIsoDate;
@@ -94,9 +101,16 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
     previousMonthDate.getUTCFullYear(),
     previousMonthDate.getUTCMonth(),
   );
+  useEffect(() => {
+    setBookingOverrides({});
+  }, [bookings]);
+  const effectiveBookings = useMemo(
+    () => bookings.map(booking => bookingOverrides[booking.id] ?? booking),
+    [bookingOverrides, bookings],
+  );
   const visibleBookings = useMemo(
     () =>
-      bookings
+      effectiveBookings
         .filter(booking => {
           const stayDates = iterateStayDates(booking.checkIn, booking.checkOut);
 
@@ -130,7 +144,7 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
         })
         .sort((first, second) => first.checkIn.localeCompare(second.checkIn)),
     [
-      bookings,
+      effectiveBookings,
       last8DaysStart,
       previousMonthEnd,
       previousMonthStart,
@@ -144,7 +158,7 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
   const bookedDateCounts = useMemo(() => {
     const dateCounts = new Map<string, number>();
 
-    bookings.forEach(booking => {
+    effectiveBookings.forEach(booking => {
       iterateStayDates(booking.checkIn, booking.checkOut).forEach(date => {
         if (!isDateInWindow(date, selectedMonthStart, selectedMonthEnd)) {
           return;
@@ -155,7 +169,7 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
     });
 
     return dateCounts;
-  }, [bookings, selectedMonthEnd, selectedMonthStart]);
+  }, [effectiveBookings, selectedMonthEnd, selectedMonthStart]);
   const calendarDays = useMemo(() => {
     const daySlots = buildCalendarGrid(selectedYear, selectedMonthIndex);
 
@@ -190,6 +204,34 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
     selectedYear,
     todayIsoDate,
   ]);
+  const selectedBooking = useMemo(
+    () =>
+      selectedBookingId === null
+        ? null
+        : effectiveBookings.find(booking => booking.id === selectedBookingId) ?? null,
+    [effectiveBookings, selectedBookingId],
+  );
+
+  if (selectedBooking) {
+    return (
+      <BookingDetailsScreen
+        activeTab={activeTab}
+        booking={selectedBooking}
+        onBack={() => setSelectedBookingId(null)}
+        onBookingUpdated={updatedBooking =>
+          setBookingOverrides(current => ({
+            ...current,
+            [updatedBooking.id]: updatedBooking,
+          }))
+        }
+        onTabPress={tab => {
+          setSelectedBookingId(null);
+          onTabPress(tab);
+        }}
+        viewerRole="owner"
+      />
+    );
+  }
 
   const handleQuickFilterPress = (value: QuickFilter) => {
     if (value === 'today') {
@@ -418,8 +460,11 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
                   visibleBookings.map(booking => (
                     <BookingListItem
                       key={booking.id}
+                      onPress={() => setSelectedBookingId(booking.id)}
                       subtitle={`${formatBookingStatusLabel(
                         booking.bookingStatus,
+                      )} | ${formatBookingPaymentStatusLabel(
+                        booking.paymentStatus,
                       )} | ${booking.tenantName ?? 'Tenant'} | ${formatBookingRange(
                         booking.checkIn,
                         booking.checkOut,
@@ -469,12 +514,14 @@ const FilterPill: React.FC<FilterPillProps> = ({label, onPress, selected}) => {
 };
 
 type BookingListItemProps = {
+  onPress: () => void;
   subtitle: string;
   trailingLabel: string;
   title: string;
 };
 
 const BookingListItem: React.FC<BookingListItemProps> = ({
+  onPress,
   subtitle,
   title,
   trailingLabel,
@@ -490,7 +537,10 @@ const BookingListItem: React.FC<BookingListItemProps> = ({
         </Text>
       </View>
 
-      <Pressable accessibilityRole="button" style={styles.viewButton}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onPress}
+        style={styles.viewButton}>
         <Text numberOfLines={1} style={styles.viewButtonText}>
           {trailingLabel}
         </Text>

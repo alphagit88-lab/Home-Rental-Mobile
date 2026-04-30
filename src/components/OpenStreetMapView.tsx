@@ -27,6 +27,7 @@ export type OpenStreetMapMarker = {
   latitude: number;
   longitude: number;
   showTooltip?: boolean;
+  tone?: 'accepted' | 'default' | 'serviceArea';
   title?: string;
 };
 
@@ -163,12 +164,21 @@ const MarkerPin: React.FC<{
   highlighted?: boolean;
   label: string;
   selected?: boolean;
-}> = ({highlighted = false, label, selected = false}) => (
+  tone?: 'accepted' | 'default' | 'serviceArea';
+}> = ({highlighted = false, label, selected = false, tone}) => {
+  const resolvedTone =
+    tone ?? (highlighted ? 'accepted' : 'default');
+
+  return (
   <View style={styles.pinWrap}>
     <View
       style={[
         styles.pinBody,
-        highlighted ? styles.pinBodyHighlighted : styles.pinBodyDefault,
+        resolvedTone === 'serviceArea'
+          ? styles.pinBodyServiceArea
+          : resolvedTone === 'accepted'
+            ? styles.pinBodyAccepted
+            : styles.pinBodyDefault,
         selected ? styles.pinBodySelected : null,
       ]}>
       <Text style={styles.pinLabel}>{label}</Text>
@@ -176,12 +186,17 @@ const MarkerPin: React.FC<{
     <View
       style={[
         styles.pinTail,
-        highlighted ? styles.pinTailHighlighted : styles.pinTailDefault,
+        resolvedTone === 'serviceArea'
+          ? styles.pinTailServiceArea
+          : resolvedTone === 'accepted'
+            ? styles.pinTailAccepted
+            : styles.pinTailDefault,
         selected ? styles.pinTailSelected : null,
       ]}
     />
   </View>
-);
+  );
+};
 
 export const OpenStreetMapView = forwardRef<
   OpenStreetMapViewHandle,
@@ -392,6 +407,7 @@ export const OpenStreetMapView = forwardRef<
               <MarkerPin
                 highlighted={marker.highlighted}
                 label={marker.indexLabel || '*'}
+                tone={marker.tone}
               />
               {marker.showTooltip ? (
                 <Callout tooltip>
@@ -453,8 +469,11 @@ const styles = StyleSheet.create({
   pinBodyDefault: {
     backgroundColor: '#F0B53A',
   },
-  pinBodyHighlighted: {
+  pinBodyAccepted: {
     backgroundColor: '#3F7765',
+  },
+  pinBodyServiceArea: {
+    backgroundColor: '#2F80ED',
   },
   pinBodySelected: {
     backgroundColor: '#3F7765',
@@ -475,8 +494,11 @@ const styles = StyleSheet.create({
   pinTailDefault: {
     backgroundColor: '#F0B53A',
   },
-  pinTailHighlighted: {
+  pinTailAccepted: {
     backgroundColor: '#3F7765',
+  },
+  pinTailServiceArea: {
+    backgroundColor: '#2F80ED',
   },
   pinTailSelected: {
     backgroundColor: '#3F7765',

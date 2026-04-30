@@ -27,9 +27,14 @@ import PoolIcon from '../assets/images/swimming-pool-svgrepo-com.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
+import {InlineMessage} from '../hooks/useLoginScreen';
 import {useTenantProperties} from '../hooks/useTenantProperties';
 import {useResponsive} from '../hooks/useResponsive';
-import {createBooking} from '../services/bookings';
+import {
+  BookingRecord,
+  createBooking,
+  payBookingDeposit,
+} from '../services/bookings';
 import {getAuthSession} from '../services/authSession';
 import {PropertyRecord} from '../services/properties';
 import {BookingPaymentDraft, PropertyBookingDraft} from '../types/propertyBooking';
@@ -45,6 +50,7 @@ import {
   hasPropertyBookableStayDates,
   formatPropertyRentCompact,
 } from '../utils/propertyPresentation';
+import {BookingDetailsScreen} from './BookingDetailsScreen';
 import {PropertyBookingScreen} from './PropertyBookingScreen';
 import {PropertyDetailsScreen} from './PropertyDetailsScreen';
 import {PropertyPaymentScreen} from './PropertyPaymentScreen';
@@ -320,6 +326,9 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
   const [selectedProperty, setSelectedProperty] = useState<PropertyRecord | null>(
     null,
   );
+  const [createdBooking, setCreatedBooking] = useState<BookingRecord | null>(null);
+  const [createdBookingMessage, setCreatedBookingMessage] =
+    useState<InlineMessage | null>(null);
   const [bookingDraft, setBookingDraft] = useState<PropertyBookingDraft>(
     createBookingDraft(),
   );
@@ -503,9 +512,32 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
 
   const openPropertyDetails = (property: PropertyRecord) => {
     setSelectedProperty(property);
+    setCreatedBooking(null);
+    setCreatedBookingMessage(null);
     setBookingDraft(createBookingDraft());
     setDetailVisible(true);
   };
+
+  if (createdBooking) {
+    return (
+      <BookingDetailsScreen
+        activeTab={activeTab}
+        booking={createdBooking}
+        initialMessage={createdBookingMessage}
+        onBack={() => {
+          setCreatedBooking(null);
+          setCreatedBookingMessage(null);
+        }}
+        onBookingUpdated={updatedBooking => setCreatedBooking(updatedBooking)}
+        onTabPress={tab => {
+          setCreatedBooking(null);
+          setCreatedBookingMessage(null);
+          onTabPress(tab);
+        }}
+        viewerRole="tenant"
+      />
+    );
+  }
 
   if (paymentVisible && selectedProperty) {
     return (
@@ -528,9 +560,14 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             throw new Error('Please add valid check-in and check-out dates.');
           }
 
-          const cardDigits = paymentDraft.cardNumber.replace(/\D/g, '');
+          if (selectedProperty.monthlyRent === null) {
+            throw new Error(
+              'This property cannot be booked until the owner adds the monthly rent.',
+            );
+          }
 
-          await createBooking(session.token, {
+          const cardDigits = paymentDraft.cardNumber.replace(/\D/g, '');
+          const nextCreatedBooking = await createBooking(session.token, {
             cardLast4: cardDigits.length >= 4 ? cardDigits.slice(-4) : null,
             checkIn: normalizedBookingCheckIn,
             checkOut: normalizedBookingCheckOut,
@@ -543,16 +580,43 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             serviceNotes: bookingDraft.serviceNotes.trim() || null,
           });
 
+          let nextBooking = nextCreatedBooking;
+          let nextMessage: InlineMessage = {
+            text: 'Booking created successfully. Pay the 20% deposit within 24 hours to keep it active.',
+            tone: 'success',
+          };
+
+          try {
+            nextBooking = await payBookingDeposit(session.token, nextCreatedBooking.id, {
+              cardLast4: cardDigits.length >= 4 ? cardDigits.slice(-4) : null,
+              paymentMethod: 'card',
+            });
+            nextMessage = {
+              text: 'The booking was created and the 20% deposit was paid successfully. You can pay the remaining balance later from this booking.',
+              tone: 'success',
+            };
+          } catch (error) {
+            nextMessage = {
+              text:
+                'The booking was created, but the 20% deposit was not paid yet. Use the button on this booking details page to complete it within 24 hours.',
+              tone: 'error',
+            };
+          }
+
           setBookingDraft(createBookingDraft());
           setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);
-          onTabPress('bookings');
+          setSelectedProperty(null);
+          setCreatedBooking(nextBooking);
+          setCreatedBookingMessage(nextMessage);
         }}
         onTabPress={tab => {
           setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);
+          setCreatedBooking(null);
+          setCreatedBookingMessage(null);
           onTabPress(tab);
         }}
         property={selectedProperty}
@@ -571,6 +635,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);
+          setCreatedBooking(null);
+          setCreatedBookingMessage(null);
           onTabPress(tab);
         }}
         onUpdateBookingDraft={updates =>
@@ -589,6 +655,8 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
         onBookNow={() => setBookingVisible(true)}
         onTabPress={tab => {
           setDetailVisible(false);
+          setCreatedBooking(null);
+          setCreatedBookingMessage(null);
           onTabPress(tab);
         }}
         property={selectedProperty}

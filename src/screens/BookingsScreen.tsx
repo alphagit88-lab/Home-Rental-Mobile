@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Platform,
   Pressable,
@@ -18,15 +18,18 @@ import StarIcon from '../assets/images/Star.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useTenantBookings} from '../hooks/useTenantBookings';
+import {BookingRecord} from '../services/bookings';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 import {
   formatBookingDateLabel,
   formatBookingMoney,
+  formatBookingPaymentStatusLabel,
   formatBookingRange,
   formatBookingServiceRequestSummary,
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
+import {BookingDetailsScreen} from './BookingDetailsScreen';
 
 type BookingsScreenProps = {
   activeTab: AppTab;
@@ -43,6 +46,47 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
   const home = useHomeScreen();
   const {bookings, errorMessage, loading} = useTenantBookings();
   const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const [bookingOverrides, setBookingOverrides] = useState<
+    Record<number, BookingRecord>
+  >({});
+  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setBookingOverrides({});
+  }, [bookings]);
+
+  const effectiveBookings = useMemo(
+    () => bookings.map(booking => bookingOverrides[booking.id] ?? booking),
+    [bookingOverrides, bookings],
+  );
+  const selectedBooking = useMemo(
+    () =>
+      selectedBookingId === null
+        ? null
+        : effectiveBookings.find(booking => booking.id === selectedBookingId) ?? null,
+    [effectiveBookings, selectedBookingId],
+  );
+
+  if (selectedBooking) {
+    return (
+      <BookingDetailsScreen
+        activeTab={activeTab}
+        booking={selectedBooking}
+        onBack={() => setSelectedBookingId(null)}
+        onBookingUpdated={updatedBooking =>
+          setBookingOverrides(current => ({
+            ...current,
+            [updatedBooking.id]: updatedBooking,
+          }))
+        }
+        onTabPress={tab => {
+          setSelectedBookingId(null);
+          onTabPress(tab);
+        }}
+        viewerRole="tenant"
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -116,13 +160,13 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
               <Text style={styles.stateText}>Loading your bookings...</Text>
             ) : errorMessage ? (
               <Text style={styles.stateText}>{errorMessage}</Text>
-            ) : bookings.length === 0 ? (
+            ) : effectiveBookings.length === 0 ? (
               <Text style={styles.stateText}>
                 Your booking list will appear here after you make a reservation.
               </Text>
             ) : (
               <View style={styles.bookingList}>
-                {bookings.map(booking => (
+                {effectiveBookings.map(booking => (
                   <BookingCard
                     bookedOn={formatBookingDateLabel(
                       booking.createdAt ?? booking.checkIn,
@@ -132,10 +176,14 @@ export const BookingsScreen: React.FC<BookingsScreenProps> = ({
                     )}
                     key={booking.id}
                     metaPrimary={formatBookingStatusLabel(booking.bookingStatus)}
+                    paymentStatusLabel={formatBookingPaymentStatusLabel(
+                      booking.paymentStatus,
+                    )}
                     metaSecondary={formatBookingRange(
                       booking.checkIn,
                       booking.checkOut,
                     )}
+                    onViewPress={() => setSelectedBookingId(booking.id)}
                     serviceSummary={formatBookingServiceRequestSummary(
                       booking.serviceRequests,
                     )}
@@ -158,6 +206,8 @@ type BookingCardProps = {
   footerValue: string;
   metaPrimary: string;
   metaSecondary: string;
+  onViewPress: () => void;
+  paymentStatusLabel: string;
   serviceSummary: string;
   title: string;
 };
@@ -167,6 +217,8 @@ const BookingCard: React.FC<BookingCardProps> = ({
   footerValue,
   metaPrimary,
   metaSecondary,
+  onViewPress,
+  paymentStatusLabel,
   serviceSummary,
   title,
 }) => {
@@ -198,13 +250,19 @@ const BookingCard: React.FC<BookingCardProps> = ({
           Booked on : <Text style={styles.bookedOnStrong}>{bookedOn}</Text>
         </Text>
         <Text numberOfLines={1} style={styles.servicesText}>
+          Payment : <Text style={styles.bookedOnStrong}>{paymentStatusLabel}</Text>
+        </Text>
+        <Text numberOfLines={1} style={styles.servicesText}>
           Services : <Text style={styles.bookedOnStrong}>{serviceSummary}</Text>
         </Text>
 
         <View style={styles.bookingFooter}>
           <Text style={styles.bookingPrice}>{footerValue}</Text>
 
-          <Pressable accessibilityRole="button" style={styles.viewButton}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onViewPress}
+            style={styles.viewButton}>
             <Text style={styles.viewButtonText}>View</Text>
           </Pressable>
         </View>

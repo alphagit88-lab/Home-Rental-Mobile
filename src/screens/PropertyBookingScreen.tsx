@@ -144,6 +144,7 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
     property.availableTo,
     todayIsoDate,
   );
+  const hasRentConfigured = property.monthlyRent !== null;
   const availabilityTo =
     normalizedPropertyAvailableTo ??
     addDaysToIsoDate(todayIsoDate, 365) ??
@@ -289,6 +290,14 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   };
 
   const handleNextPress = () => {
+    if (!hasRentConfigured) {
+      setInlineMessage({
+        text: 'This property cannot be booked until the owner adds the monthly rent.',
+        tone: 'error',
+      });
+      return;
+    }
+
     if (!normalizedCheckInDate || !normalizedCheckOutDate) {
       setInlineMessage({
         text: 'Please choose both the check-in and check-out dates.',
@@ -386,7 +395,9 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
                 Add your preferred stay dates and guest count before you continue.
               </Text>
               <Text style={styles.noticeSubtext}>
-                {!hasBookableStayDates
+                {!hasRentConfigured
+                  ? 'This property cannot be booked yet because the monthly rent has not been added.'
+                  : !hasBookableStayDates
                   ? 'This listing is no longer available for a new stay.'
                   : availabilityLoading
                   ? 'Loading booked dates for this property...'
@@ -554,8 +565,12 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
 
             <Pressable
               accessibilityRole="button"
+              disabled={!hasRentConfigured}
               onPress={handleNextPress}
-              style={styles.nextButton}>
+              style={[
+                styles.nextButton,
+                !hasRentConfigured ? styles.nextButtonDisabled : null,
+              ]}>
               <Text style={styles.nextButtonText}>Next</Text>
             </Pressable>
           </View>
@@ -1118,6 +1133,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
+  },
+  nextButtonDisabled: {
+    opacity: 0.56,
   },
   nextButtonText: {
     color: colors.white,

@@ -111,6 +111,7 @@ const normalizeRequestStatus = (value: unknown): RentalServiceRequestStatus => {
   const normalizedValue = String(value ?? 'pending').trim().toLowerCase();
 
   if (
+    normalizedValue === 'awaiting_full_payment' ||
     normalizedValue === 'accepted' ||
     normalizedValue === 'cancelled' ||
     normalizedValue === 'completed'
@@ -191,6 +192,9 @@ export const normalizeRentalServiceRequest = (
   ownerEmail: toNullableString(request.ownerEmail ?? request.owner_email),
   ownerId: toNumber(request.ownerId ?? request.owner_id, 0),
   ownerName: toNullableString(request.ownerName ?? request.owner_name),
+  paymentStatus: toNullableString(
+    request.paymentStatus ?? request.payment_status,
+  ),
   propertyId: toNumber(request.propertyId ?? request.property_id, 0),
   propertyTitle: String(
     request.propertyTitle ?? request.property_title ?? 'Untitled Property',

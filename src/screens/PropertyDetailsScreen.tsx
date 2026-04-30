@@ -63,6 +63,8 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
     property.availableTo,
     todayIsoDate,
   );
+  const hasRentConfigured = property.monthlyRent !== null;
+  const canStartBooking = isBookable && hasRentConfigured;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -155,16 +157,27 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                 <Text style={styles.listingTagText}>{property.listingType}</Text>
               </View>
 
+              {!hasRentConfigured ? (
+                <Text style={styles.bookingHelpText}>
+                  The owner needs to add the monthly rent before this property
+                  can be booked.
+                </Text>
+              ) : null}
+
               <Pressable
                 accessibilityRole="button"
-                disabled={!isBookable}
+                disabled={!canStartBooking}
                 onPress={onBookNow}
                 style={[
                   styles.bookButton,
-                  !isBookable ? styles.bookButtonDisabled : null,
+                  !canStartBooking ? styles.bookButtonDisabled : null,
                 ]}>
                 <Text style={styles.bookButtonText}>
-                  {isBookable ? 'BOOK NOW' : 'NOT AVAILABLE'}
+                  {!hasRentConfigured
+                    ? 'PRICE REQUIRED'
+                    : isBookable
+                      ? 'BOOK NOW'
+                      : 'NOT AVAILABLE'}
                 </Text>
               </Pressable>
             </View>
@@ -350,6 +363,13 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontFamily: fonts.semibold,
     fontSize: 14,
+  },
+  bookingHelpText: {
+    color: colors.error,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: spacing.md,
   },
   bookButton: {
     minHeight: 54,

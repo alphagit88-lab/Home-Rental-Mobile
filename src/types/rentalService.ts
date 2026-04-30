@@ -1,4 +1,5 @@
 export type RentalServiceRequestStatus =
+  | 'awaiting_full_payment'
   | 'pending'
   | 'accepted'
   | 'cancelled'
@@ -41,6 +42,7 @@ export type RentalServiceRequestRecord = {
   ownerEmail: string | null;
   ownerId: number;
   ownerName: string | null;
+  paymentStatus: string | null;
   propertyId: number;
   propertyTitle: string;
   providerResponseStatus: ProviderResponseStatus | null;

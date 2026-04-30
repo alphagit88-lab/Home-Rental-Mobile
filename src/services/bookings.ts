@@ -19,7 +19,30 @@ export type BookingStatus =
   | 'cancelled'
   | 'completed';
 
-export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
+export type PaymentStatus =
+  | 'deposit_pending'
+  | 'deposit_paid'
+  | 'paid'
+  | 'failed'
+  | 'expired'
+  | 'refunded';
+
+export type BookingReviewRole = 'tenant' | 'owner';
+
+export type BookingReviewRecord = {
+  comment: string | null;
+  createdAt: string | null;
+  id: number;
+  rating: number;
+  rentalBookingId: number;
+  revieweeId: number;
+  revieweeName: string | null;
+  revieweeRole: BookingReviewRole;
+  reviewerId: number;
+  reviewerName: string | null;
+  reviewerRole: BookingReviewRole;
+  updatedAt: string | null;
+};
 
 export type BookingRecord = {
   bookingCode: string;
@@ -28,9 +51,13 @@ export type BookingRecord = {
   checkIn: string;
   checkOut: string;
   createdAt: string | null;
+  depositAmount: number | null;
+  depositDueAt: string | null;
+  depositPaidAt: string | null;
   guestCount: number;
   id: number;
   monthlyRent: number | null;
+  notes: string | null;
   ownerId: number;
   ownerName: string | null;
   paymentMethod: string | null;
@@ -40,6 +67,9 @@ export type BookingRecord = {
   propertyId: number;
   propertyLocationText: string;
   propertyTitle: string;
+  remainingAmount: number | null;
+  remainingPaidAt: string | null;
+  reviews: BookingReviewRecord[];
   serviceRequests: RentalServiceRequestRecord[];
   tenantEmail: string | null;
   tenantId: number;
@@ -68,6 +98,17 @@ export type CreateBookingParams = {
   propertyId: number;
   serviceCategoryIds?: number[];
   serviceNotes?: string | null;
+};
+
+export type BookingPaymentParams = {
+  cardLast4?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+};
+
+export type SaveBookingReviewParams = {
+  comment?: string | null;
+  rating: number;
 };
 
 type QueryOptions = {
@@ -134,6 +175,9 @@ const toNullableString = (value: unknown) => {
   return normalizedValue.length > 0 ? normalizedValue : null;
 };
 
+const normalizeReviewRole = (value: unknown): BookingReviewRole =>
+  String(value ?? '').trim().toLowerCase() === 'owner' ? 'owner' : 'tenant';
+
 const normalizeBookingStatus = (value: unknown): BookingStatus => {
   const normalizedValue = String(value ?? 'pending').trim().toLowerCase();
 
@@ -152,14 +196,17 @@ const normalizePaymentStatus = (value: unknown): PaymentStatus => {
   const normalizedValue = String(value ?? 'pending').trim().toLowerCase();
 
   if (
+    normalizedValue === 'deposit_pending' ||
+    normalizedValue === 'deposit_paid' ||
     normalizedValue === 'paid' ||
     normalizedValue === 'failed' ||
+    normalizedValue === 'expired' ||
     normalizedValue === 'refunded'
   ) {
     return normalizedValue;
   }
 
-  return 'pending';
+  return 'deposit_pending';
 };
 
 const normalizeDateValue = (value: unknown) => {
@@ -183,6 +230,30 @@ const normalizeDateArray = (value: unknown) => {
     ),
   ).sort((first, second) => first.localeCompare(second));
 };
+
+const normalizeBookingReview = (
+  review: Record<string, unknown>,
+): BookingReviewRecord => ({
+  comment: toNullableString(review.comment),
+  createdAt: toNullableString(review.createdAt ?? review.created_at),
+  id: toNumber(review.id, 0),
+  rating: toNumber(review.rating, 0),
+  rentalBookingId: toNumber(
+    review.rentalBookingId ?? review.rental_booking_id,
+    0,
+  ),
+  revieweeId: toNumber(review.revieweeId ?? review.reviewee_id, 0),
+  revieweeName: toNullableString(review.revieweeName ?? review.reviewee_name),
+  revieweeRole: normalizeReviewRole(
+    review.revieweeRole ?? review.reviewee_role,
+  ),
+  reviewerId: toNumber(review.reviewerId ?? review.reviewer_id, 0),
+  reviewerName: toNullableString(review.reviewerName ?? review.reviewer_name),
+  reviewerRole: normalizeReviewRole(
+    review.reviewerRole ?? review.reviewer_role,
+  ),
+  updatedAt: toNullableString(review.updatedAt ?? review.updated_at),
+});
 
 const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
   const property =
@@ -208,6 +279,13 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
         item !== null && typeof item === 'object',
     )
     .map(normalizeRentalServiceRequest);
+  const reviewsSource = Array.isArray(booking.reviews) ? booking.reviews : [];
+  const reviews = reviewsSource
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object',
+    )
+    .map(normalizeBookingReview);
 
   return {
     bookingCode: String(
@@ -227,6 +305,15 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
     checkIn: normalizeDateValue(booking.checkIn ?? booking.check_in),
     checkOut: normalizeDateValue(booking.checkOut ?? booking.check_out),
     createdAt: toNullableString(booking.createdAt ?? booking.created_at),
+    depositAmount: toNullableNumber(
+      booking.depositAmount ?? booking.deposit_amount,
+    ),
+    depositDueAt: toNullableString(
+      booking.depositDueAt ?? booking.deposit_due_at,
+    ),
+    depositPaidAt: toNullableString(
+      booking.depositPaidAt ?? booking.deposit_paid_at,
+    ),
     guestCount: toNumber(
       booking.guestCount ?? booking.guest_count ?? booking.guests,
       1,
@@ -238,6 +325,7 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
         property?.monthlyRent ??
         property?.monthly_rent,
     ),
+    notes: toNullableString(booking.notes),
     ownerId: toNumber(
       booking.ownerId ?? booking.owner_id ?? owner?.id ?? property?.ownerId,
       0,
@@ -280,6 +368,13 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
         booking.title ??
         'Untitled Property',
     ),
+    remainingAmount: toNullableNumber(
+      booking.remainingAmount ?? booking.remaining_amount,
+    ),
+    remainingPaidAt: toNullableString(
+      booking.remainingPaidAt ?? booking.remaining_paid_at,
+    ),
+    reviews,
     serviceRequests,
     tenantEmail: toNullableString(
       booking.tenantEmail ?? booking.tenant_email ?? tenant?.email,
@@ -474,4 +569,75 @@ export const createBooking = async (
   );
 
   return normalizeBooking(data.booking);
+};
+
+const payBooking = async (
+  token: string,
+  bookingId: number,
+  pathSuffix: 'pay-deposit' | 'pay-balance',
+  params: BookingPaymentParams = {},
+) => {
+  const data = await requestPrivate<{booking: Record<string, unknown>}>(
+    `${BOOKINGS_API_BASE_PATH}/${bookingId}/${pathSuffix}`,
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        cardLast4: params.cardLast4 ?? null,
+        paymentMethod: params.paymentMethod ?? 'card',
+        paymentReference: params.paymentReference ?? null,
+      }),
+    },
+    pathSuffix === 'pay-deposit'
+      ? 'Unable to pay the booking deposit.'
+      : 'Unable to pay the remaining booking amount.',
+  );
+
+  return normalizeBooking(data.booking);
+};
+
+export const payBookingDeposit = async (
+  token: string,
+  bookingId: number,
+  params: BookingPaymentParams = {},
+) => payBooking(token, bookingId, 'pay-deposit', params);
+
+export const payBookingBalance = async (
+  token: string,
+  bookingId: number,
+  params: BookingPaymentParams = {},
+) => payBooking(token, bookingId, 'pay-balance', params);
+
+export const getBookingReviews = async (token: string, bookingId: number) => {
+  const data = await requestPrivate<{reviews: Record<string, unknown>[]}>(
+    `${BOOKINGS_API_BASE_PATH}/${bookingId}/reviews`,
+    token,
+    {
+      method: 'GET',
+    },
+    'Unable to load booking reviews.',
+  );
+
+  return data.reviews.map(normalizeBookingReview);
+};
+
+export const saveBookingReview = async (
+  token: string,
+  bookingId: number,
+  params: SaveBookingReviewParams,
+) => {
+  const data = await requestPrivate<{review: Record<string, unknown>}>(
+    `${BOOKINGS_API_BASE_PATH}/${bookingId}/reviews`,
+    token,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        comment: params.comment?.trim() ? params.comment.trim() : null,
+        rating: params.rating,
+      }),
+    },
+    'Unable to save this booking review.',
+  );
+
+  return normalizeBookingReview(data.review);
 };

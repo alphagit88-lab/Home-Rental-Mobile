@@ -145,10 +145,10 @@ export const ServiceProviderMapScreen: React.FC<
           ]
             .filter(Boolean)
             .join(' | '),
-          highlighted: marker.bucket === 'assigned',
           indexLabel: marker.bucket === 'assigned' ? 'A' : 'N',
           latitude: marker.latitude,
           longitude: marker.longitude,
+          tone: marker.bucket === 'assigned' ? 'accepted' : 'default',
           title: marker.propertyTitle,
         })),
     [markers],
@@ -167,10 +167,10 @@ export const ServiceProviderMapScreen: React.FC<
             `${serviceArea.city}, ${serviceArea.country}`,
             formatRadiusLabel(serviceArea.areaRadiusKm),
           ].join(' | '),
-          highlighted: true,
           indexLabel: 'S',
           latitude: serviceArea.latitude as number,
           longitude: serviceArea.longitude as number,
+          tone: 'serviceArea' as const,
           title: `${serviceArea.city} service area`,
         })),
     [effectiveServiceAreas],
@@ -190,11 +190,11 @@ export const ServiceProviderMapScreen: React.FC<
           description: `${serviceArea.city}, ${serviceArea.country} | ${formatRadiusLabel(
             serviceArea.areaRadiusKm,
           )}`,
-          fillColor: 'rgba(47, 125, 96, 0.18)',
+          fillColor: 'rgba(47, 128, 237, 0.18)',
           latitude: serviceArea.latitude as number,
           longitude: serviceArea.longitude as number,
           radiusKm: serviceArea.areaRadiusKm as number,
-          strokeColor: '#2F7D60',
+          strokeColor: '#2F80ED',
           title: `${serviceArea.city} coverage`,
         })),
     [effectiveServiceAreas],
@@ -350,7 +350,7 @@ export const ServiceProviderMapScreen: React.FC<
             <View style={styles.mapCard}>
               <Text style={styles.mapTitle}>Service area and request map</Text>
               <Text style={styles.mapText}>
-                `S` markers and green circles show your saved service locations
+                `S` markers and blue circles show your saved service locations
                 and radii. `N` markers are nearby tenant requests. `A` markers
                 are requests already accepted by you.
               </Text>
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DCEDE7',
   },
   legendChipRadius: {
-    backgroundColor: '#E1F1EA',
+    backgroundColor: '#E3F0FF',
   },
   legendChipText: {
     color: colors.textPrimary,

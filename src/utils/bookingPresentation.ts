@@ -1,4 +1,8 @@
 import {normalizeDateString} from './dateInput';
+import {
+  BookingReviewRecord,
+  PaymentStatus,
+} from '../services/bookings';
 import {RentalServiceRequestRecord} from '../types/rentalService';
 
 const formatMoneyValue = (value: number) => {
@@ -75,6 +79,58 @@ export const formatBookingStatusLabel = (value?: string | null) => {
     .join(' ');
 };
 
+export const formatBookingPaymentStatusLabel = (
+  value?: PaymentStatus | string | null,
+) => {
+  const normalizedValue = String(value ?? '').trim().toLowerCase();
+
+  if (normalizedValue === 'deposit_pending') {
+    return 'Deposit Pending';
+  }
+
+  if (normalizedValue === 'deposit_paid') {
+    return 'Deposit Paid';
+  }
+
+  if (normalizedValue === 'paid') {
+    return 'Paid in Full';
+  }
+
+  if (normalizedValue === 'failed') {
+    return 'Payment Failed';
+  }
+
+  if (normalizedValue === 'expired') {
+    return 'Deposit Expired';
+  }
+
+  if (normalizedValue === 'refunded') {
+    return 'Refunded';
+  }
+
+  return 'Payment Pending';
+};
+
+export const formatBookingDateTimeLabel = (value?: string | null) => {
+  if (!value) {
+    return 'Not recorded';
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return String(value);
+  }
+
+  return parsedDate.toLocaleString('en-US', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
 export const formatBookingServiceRequestSummary = (
   serviceRequests: RentalServiceRequestRecord[] = [],
 ) => {
@@ -97,4 +153,22 @@ export const formatBookingServiceRequestSummary = (
   }
 
   return categoryNames.join(', ');
+};
+
+export const formatBookingReviewSummary = (
+  reviews: BookingReviewRecord[] = [],
+) => {
+  if (reviews.length === 0) {
+    return 'No reviews yet';
+  }
+
+  const totalRating = reviews.reduce(
+    (sum, review) => sum + Math.max(review.rating, 0),
+    0,
+  );
+  const averageRating = totalRating / reviews.length;
+
+  return `${averageRating.toFixed(1)} / 5 from ${reviews.length} review${
+    reviews.length === 1 ? '' : 's'
+  }`;
 };

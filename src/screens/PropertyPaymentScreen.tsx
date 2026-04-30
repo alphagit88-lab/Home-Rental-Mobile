@@ -30,6 +30,7 @@ import {getAuthSession} from '../services/authSession';
 import {PropertyRecord} from '../services/properties';
 import {BookingPaymentDraft, PropertyBookingDraft} from '../types/propertyBooking';
 import {colors, fonts, spacing} from '../theme';
+import {formatBookingMoney} from '../utils/bookingPresentation';
 import {
   formatPropertyAvailability,
   formatPropertyRent,
@@ -79,6 +80,15 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
     'idle',
   );
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
+  const hasRentConfigured = property.monthlyRent !== null;
+  const depositAmount =
+    property.monthlyRent === null
+      ? null
+      : Number((property.monthlyRent * 0.2).toFixed(2));
+  const remainingAmount =
+    property.monthlyRent === null || depositAmount === null
+      ? null
+      : Number((property.monthlyRent - depositAmount).toFixed(2));
 
   const handleCardNumberChange = (value: string) => {
     const digitsOnly = value.replace(/\D/g, '').slice(0, 16);
@@ -102,6 +112,15 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
   };
 
   const handleBookNowPress = async () => {
+    if (!hasRentConfigured) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'This property cannot be booked until the owner adds the monthly rent.',
+        tone: 'error',
+      });
+      return;
+    }
+
     if (!fullName.trim()) {
       setSubmitState('error');
       setInlineMessage({
@@ -213,6 +232,14 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 value={formatPropertyRent(property.monthlyRent)}
               />
               <SummaryRow
+                label="20% deposit now"
+                value={formatBookingMoney(depositAmount)}
+              />
+              <SummaryRow
+                label="Remaining later"
+                value={formatBookingMoney(remainingAmount)}
+              />
+              <SummaryRow
                 label="Available"
                 value={formatPropertyAvailability(
                   property.availableFrom,
@@ -251,6 +278,17 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
               </View>
             ) : null}
 
+            {!hasRentConfigured ? (
+              <View style={styles.inlineMessageWrap}>
+                <InlineStateMessage
+                  message={{
+                    text: 'The owner must add the monthly rent before the booking deposit can be charged.',
+                    tone: 'error',
+                  }}
+                />
+              </View>
+            ) : null}
+
             <InputField
               icon={<ProfileIcon height={22} width={22} />}
               onChangeText={setFullName}
@@ -267,9 +305,12 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
             />
 
             <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Payment details</Text>
+              <Text style={styles.noticeTitle}>Pay 20% deposit now</Text>
               <Text style={styles.noticeText}>
-                Enter your payment details to finish this booking request.
+                This step creates the booking and immediately charges the 20%
+                deposit using these card details. The remaining balance can be
+                paid later from the booking details screen, and service
+                provider requests only open after full payment.
               </Text>
             </View>
 
@@ -360,16 +401,20 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
 
             <Pressable
               accessibilityRole="button"
-              disabled={submitState === 'loading'}
+              disabled={submitState === 'loading' || !hasRentConfigured}
               onPress={() => {
                 void handleBookNowPress();
               }}
               style={[
                 styles.bookNowButton,
-                submitState === 'loading' ? styles.bookNowButtonDisabled : null,
+                submitState === 'loading' || !hasRentConfigured
+                  ? styles.bookNowButtonDisabled
+                  : null,
               ]}>
               <Text style={styles.bookNowButtonText}>
-                {submitState === 'loading' ? 'Submitting...' : 'Submit Booking'}
+                {submitState === 'loading'
+                  ? 'Paying Deposit...'
+                  : 'Create Booking & Pay 20%'}
               </Text>
             </Pressable>
           </View>
