@@ -141,6 +141,10 @@ export const OwnerPropertyDetailsScreen: React.FC<
                   property.availableTo,
                 )}
               />
+              <InfoRow
+                label="Status"
+                value={property.isActive ? 'Active' : 'Inactive'}
+              />
 
               <PropertyMapCard
                 latitude={property.latitude}

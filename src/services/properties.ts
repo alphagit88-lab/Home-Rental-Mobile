@@ -13,6 +13,7 @@ export type PropertyRecord = {
   ownerId: number | null;
   propertyCode: string;
   title: string;
+  isActive: boolean;
   propertyType: string;
   listingType: string;
   monthlyRent: number | null;
@@ -38,6 +39,7 @@ export type SavePropertyParams = {
   bedrooms: number;
   description: string;
   galleryUrls: string[];
+  isActive?: boolean;
   latitude?: number;
   listingType: string;
   locationText: string;
@@ -126,6 +128,75 @@ const toNullableNumber = (value: unknown) => {
 
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toBoolean = (value: unknown, fallback = false) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    if (value.trim().toLowerCase() === 'true') {
+      return true;
+    }
+
+    if (value.trim().toLowerCase() === 'false') {
+      return false;
+    }
+  }
+
+  if (typeof value === 'number') {
+    return value !== 0;
+  }
+
+  return fallback;
+};
+
+const toActiveStatusFromText = (value: unknown) => {
+  const normalizedValue = String(value ?? '')
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalizedValue === 'inactive' ||
+    normalizedValue === 'deactivated' ||
+    normalizedValue === 'disabled' ||
+    normalizedValue === 'hidden' ||
+    normalizedValue === 'draft' ||
+    normalizedValue === 'unpublished'
+  ) {
+    return false;
+  }
+
+  if (
+    normalizedValue === 'active' ||
+    normalizedValue === 'activated' ||
+    normalizedValue === 'enabled' ||
+    normalizedValue === 'visible' ||
+    normalizedValue === 'published'
+  ) {
+    return true;
+  }
+
+  return null;
+};
+
+const resolvePropertyActiveStatus = (property: Record<string, unknown>) => {
+  const statusFromBoolean = property.isActive ?? property.is_active;
+
+  if (statusFromBoolean !== undefined && statusFromBoolean !== null) {
+    return toBoolean(statusFromBoolean, true);
+  }
+
+  const statusFromText = toActiveStatusFromText(
+    property.status ??
+      property.propertyStatus ??
+      property.property_status ??
+      property.activeStatus ??
+      property.active_status,
+  );
+
+  return statusFromText ?? true;
 };
 
 const normalizeOptionalDate = (value: unknown) => {
@@ -329,6 +400,7 @@ const normalizeProperty = async (
       property.propertyCode ?? property.property_code ?? `PRO-${property.id ?? ''}`,
     ),
     title: String(property.title ?? property.name ?? 'Untitled Property'),
+    isActive: resolvePropertyActiveStatus(property),
     propertyType: String(property.propertyType ?? property.property_type ?? 'House'),
     listingType: String(property.listingType ?? property.listing_type ?? 'For Rent'),
     monthlyRent: toNullableNumber(
@@ -362,6 +434,37 @@ const normalizeProperty = async (
       property.updatedAt === null || property.updated_at === null
         ? null
         : String(property.updatedAt ?? property.updated_at),
+  };
+};
+
+const hasReturnedActiveStatus = (property: Record<string, unknown>) =>
+  Object.prototype.hasOwnProperty.call(property, 'isActive') ||
+  Object.prototype.hasOwnProperty.call(property, 'is_active');
+
+const applySubmittedActiveStatus = (
+  property: PropertyRecord,
+  rawProperty: Record<string, unknown>,
+  submittedStatus?: boolean,
+) => {
+  if (hasReturnedActiveStatus(rawProperty) || submittedStatus === undefined) {
+    return property;
+  }
+
+  return {
+    ...property,
+    isActive: submittedStatus,
+  };
+};
+
+const serializePropertyPayload = (params: SavePropertyParams) => {
+  if (params.isActive === undefined) {
+    return params;
+  }
+
+  return {
+    ...params,
+    isActive: params.isActive,
+    is_active: params.isActive,
   };
 };
 
@@ -478,7 +581,8 @@ export const getActiveProperties = async () => {
     'Unable to load properties.',
   );
 
-  return Promise.all(data.properties.map(normalizeProperty));
+  const properties = await Promise.all(data.properties.map(normalizeProperty));
+  return properties.filter(property => property.isActive);
 };
 
 export const getMyProperties = async (token: string) => {
@@ -504,12 +608,13 @@ export const createProperty = async (
     token,
     {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(serializePropertyPayload(payload)),
     },
     'Unable to create your property.',
   );
 
-  return normalizeProperty(data.property);
+  const property = await normalizeProperty(data.property);
+  return applySubmittedActiveStatus(property, data.property, params.isActive);
 };
 
 export const updateProperty = async (
@@ -523,10 +628,11 @@ export const updateProperty = async (
     token,
     {
       method: 'PUT',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(serializePropertyPayload(payload)),
     },
     'Unable to update your property.',
   );
 
-  return normalizeProperty(data.property);
+  const property = await normalizeProperty(data.property);
+  return applySubmittedActiveStatus(property, data.property, params.isActive);
 };

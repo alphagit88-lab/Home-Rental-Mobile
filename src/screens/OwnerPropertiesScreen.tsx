@@ -112,6 +112,7 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
                   {properties.map(property => (
                     <OwnerPropertyCard
                       code={property.propertyCode}
+                      isActive={property.isActive}
                       key={property.id}
                       onPress={() => onViewPropertyPress(property)}
                       title={property.title}
@@ -131,22 +132,34 @@ export const OwnerPropertiesScreen: React.FC<OwnerPropertiesScreenProps> = ({
 
 type OwnerPropertyCardProps = {
   code: string;
+  isActive: boolean;
   onPress: () => void;
   title: string;
 };
 
 const OwnerPropertyCard: React.FC<OwnerPropertyCardProps> = ({
   code,
+  isActive,
   onPress,
   title,
 }) => {
   return (
-    <View style={styles.propertyCard}>
+    <View
+      style={[
+        styles.propertyCard,
+        !isActive ? styles.propertyCardInactive : null,
+      ]}>
       <View style={styles.propertyTextWrap}>
         <Text numberOfLines={1} style={styles.propertyTitle}>
           {title}
         </Text>
-        <Text style={styles.propertyCode}>{code}</Text>
+        <Text
+          style={[
+            styles.propertyCode,
+            !isActive ? styles.propertyCodeInactive : null,
+          ]}>
+          {code}
+        </Text>
       </View>
 
       <Pressable
@@ -295,6 +308,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm + 4,
     gap: spacing.sm,
   },
+  propertyCardInactive: {
+    backgroundColor: colors.error,
+  },
   propertyTextWrap: {
     flex: 1,
   },
@@ -308,6 +324,9 @@ const styles = StyleSheet.create({
     color: '#E3E9E6',
     fontFamily: fonts.regular,
     fontSize: 12,
+  },
+  propertyCodeInactive: {
+    color: '#F9DEDE',
   },
   viewButton: {
     minHeight: 28,

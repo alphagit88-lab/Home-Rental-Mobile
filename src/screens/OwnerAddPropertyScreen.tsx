@@ -131,6 +131,11 @@ type GalleryPickerModalProps = {
   visible: boolean;
 };
 
+type PropertyStatusFieldProps = {
+  isActive: boolean;
+  onStatusChange: (value: boolean) => void;
+};
+
 const propertyTypeOptions = ['Apartment', 'House', 'Room / Boarding'];
 const listingTypeOptions = ['For Rent', 'Short-term'];
 const monthLabels = [
@@ -270,7 +275,9 @@ const parseMoneyValue = (value: string) => {
 };
 
 const isValidDateValue = (value: string) => {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value) && normalizeDateString(value) === value;
+  return (
+    /^\d{4}-\d{2}-\d{2}$/.test(value) && normalizeDateString(value) === value
+  );
 };
 
 const normalizeDateValue = (value: string) => {
@@ -292,7 +299,8 @@ const sanitizeCounterInput = (value: string) => value.replace(/[^0-9]/g, '');
 
 const adjustCounterValue = (value: string, delta: number) => {
   const parsed = Number(sanitizeCounterInput(value));
-  const nextValue = Number.isFinite(parsed) && parsed > 0 ? parsed + delta : 1 + delta;
+  const nextValue =
+    Number.isFinite(parsed) && parsed > 0 ? parsed + delta : 1 + delta;
 
   return formatCounterValue(Math.max(1, nextValue));
 };
@@ -340,11 +348,7 @@ const getTodayIsoDate = () => {
 const getLaterIsoDate = (firstValue: string, secondValue: string) =>
   firstValue >= secondValue ? firstValue : secondValue;
 
-const formatCalendarDate = (
-  year: number,
-  monthIndex: number,
-  day: number,
-) =>
+const formatCalendarDate = (year: number, monthIndex: number, day: number) =>
   `${String(year).padStart(4, '0')}-${String(monthIndex + 1).padStart(
     2,
     '0',
@@ -355,8 +359,7 @@ const buildCalendarGrid = (year: number, monthIndex: number) => {
   const totalDays = getDaysInMonth(year, monthIndex);
   const leadingSlots = Array.from({length: firstWeekday}, () => null);
   const daySlots = Array.from({length: totalDays}, (_, index) => index + 1);
-  const trailingCount =
-    (7 - ((leadingSlots.length + daySlots.length) % 7)) % 7;
+  const trailingCount = (7 - ((leadingSlots.length + daySlots.length) % 7)) % 7;
   const trailingSlots = Array.from({length: trailingCount}, () => null);
 
   return [...leadingSlots, ...daySlots, ...trailingSlots];
@@ -367,9 +370,7 @@ const getInitialCalendarState = (
   minimumValue?: string | null,
 ) => {
   const normalizedMinimumValue =
-    minimumValue && normalizeDateString(minimumValue)
-      ? minimumValue
-      : null;
+    minimumValue && normalizeDateString(minimumValue) ? minimumValue : null;
   const parsedDate =
     value.trim().length > 0 &&
     (!normalizedMinimumValue || value >= normalizedMinimumValue)
@@ -429,12 +430,16 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   const responsive = useResponsive();
   const [propertyName, setPropertyName] = useState(property?.title ?? '');
   const [propertyTypeIndex, setPropertyTypeIndex] = useState(() => {
-    const index = propertyTypeOptions.indexOf(property?.propertyType ?? 'Apartment');
+    const index = propertyTypeOptions.indexOf(
+      property?.propertyType ?? 'Apartment',
+    );
     return index >= 0 ? index : 0;
   });
   const [isPropertyTypeOpen, setIsPropertyTypeOpen] = useState(false);
   const [listingTypeIndex, setListingTypeIndex] = useState(() => {
-    const index = listingTypeOptions.indexOf(property?.listingType ?? 'For Rent');
+    const index = listingTypeOptions.indexOf(
+      property?.listingType ?? 'For Rent',
+    );
     return index >= 0 ? index : 0;
   });
   const [isListingTypeOpen, setIsListingTypeOpen] = useState(false);
@@ -453,9 +458,9 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   const [availableTo, setAvailableTo] = useState(
     formatDateValue(property?.availableTo),
   );
-  const [selectedAmenityKeys, setSelectedAmenityKeys] = useState<AmenityOptionKey[]>(
-    () => getAmenityOptionKeys(property?.amenities ?? []),
-  );
+  const [selectedAmenityKeys, setSelectedAmenityKeys] = useState<
+    AmenityOptionKey[]
+  >(() => getAmenityOptionKeys(property?.amenities ?? []));
   const [isAmenitiesDropdownOpen, setIsAmenitiesDropdownOpen] = useState(false);
   const [location, setLocation] = useState(property?.locationText ?? '');
   const [selectedCoordinate, setSelectedCoordinate] =
@@ -469,13 +474,15 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
     null,
   );
   const [description, setDescription] = useState(property?.description ?? '');
+  const [isPropertyActive, setIsPropertyActive] = useState(
+    property?.isActive ?? true,
+  );
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'error'>(
     'idle',
   );
   const [inlineMessage, setInlineMessage] = useState<string | null>(null);
   const todayIsoDate = getTodayIsoDate();
-  const normalizedAvailableFrom =
-    normalizeDateString(availableFrom) ?? '';
+  const normalizedAvailableFrom = normalizeDateString(availableFrom) ?? '';
   const minimumAvailableToDate = normalizedAvailableFrom
     ? getLaterIsoDate(todayIsoDate, normalizedAvailableFrom)
     : todayIsoDate;
@@ -568,7 +575,9 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
   const handleSubmit = async () => {
     if (!propertyName.trim() || !location.trim()) {
       setSubmitState('error');
-      setInlineMessage('Please complete at least the property name and location.');
+      setInlineMessage(
+        'Please complete at least the property name and location.',
+      );
       return;
     }
 
@@ -591,7 +600,9 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
 
     if (Number.isNaN(parsedMonthlyRent)) {
       setSubmitState('error');
-      setInlineMessage('Monthly rent must be a valid number greater than or equal to 0.');
+      setInlineMessage(
+        'Monthly rent must be a valid number greater than or equal to 0.',
+      );
       return;
     }
 
@@ -642,6 +653,7 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
       longitude: selectedCoordinate?.longitude,
       galleryUrls: gallery,
       description: description.trim(),
+      ...(mode === 'edit' ? {isActive: isPropertyActive} : {}),
     };
 
     setSubmitState('loading');
@@ -771,7 +783,7 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
 
               <TextField
                 keyboardType="decimal-pad"
-                label="Monthly Rent (LKR)"
+                label=" Rent Fee (LKR)"
                 onChangeText={setMonthlyRent}
                 placeholder="45000"
                 value={monthlyRent}
@@ -790,8 +802,8 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
               />
 
               <Text style={styles.helperText}>
-                Tap the calendar icon to choose the available date range. Leave the
-                dates empty if the property is available anytime.
+                Tap the calendar icon to choose the available date range. Leave
+                the dates empty if the property is available anytime.
               </Text>
 
               <AmenitiesDropdownField
@@ -804,9 +816,7 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                       : [...current, key],
                   )
                 }
-                onToggleOpen={() =>
-                  toggleAmenitiesOpen()
-                }
+                onToggleOpen={() => toggleAmenitiesOpen()}
                 selectedKeys={selectedAmenityKeys}
               />
 
@@ -853,6 +863,13 @@ export const OwnerAddPropertyScreen: React.FC<OwnerAddPropertyScreenProps> = ({
                 placeholder="Property Description"
                 value={description}
               />
+
+              {mode === 'edit' ? (
+                <PropertyStatusField
+                  isActive={isPropertyActive}
+                  onStatusChange={setIsPropertyActive}
+                />
+              ) : null}
 
               {inlineMessage ? (
                 <Text
@@ -1259,7 +1276,9 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
 }) => {
   const initialCalendarState = getInitialCalendarState(value, minimumValue);
   const [displayYear, setDisplayYear] = useState(initialCalendarState.year);
-  const [displayMonth, setDisplayMonth] = useState(initialCalendarState.monthIndex);
+  const [displayMonth, setDisplayMonth] = useState(
+    initialCalendarState.monthIndex,
+  );
   const [selectedValue, setSelectedValue] = useState(
     initialCalendarState.selectedValue,
   );
@@ -1318,7 +1337,9 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 onPress={() => setDisplayMonth(index)}
                 style={({pressed}) => [
                   styles.calendarMonthChip,
-                  displayMonth === index ? styles.calendarMonthChipActive : null,
+                  displayMonth === index
+                    ? styles.calendarMonthChipActive
+                    : null,
                   pressed ? styles.pressed : null,
                 ]}>
                 <Text
@@ -1345,11 +1366,19 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
           <View style={styles.calendarDayGrid}>
             {calendarDays.map((day, index) => {
               if (day === null) {
-                return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+                return (
+                  <View key={`empty-${index}`} style={styles.calendarDayCell} />
+                );
               }
 
-              const dayValue = formatCalendarDate(displayYear, displayMonth, day);
-              const isDisabled = Boolean(minimumValue && dayValue < minimumValue);
+              const dayValue = formatCalendarDate(
+                displayYear,
+                displayMonth,
+                day,
+              );
+              const isDisabled = Boolean(
+                minimumValue && dayValue < minimumValue,
+              );
               const isSelected =
                 selectedParts?.year === displayYear &&
                 selectedParts?.monthIndex === displayMonth &&
@@ -1394,7 +1423,9 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 styles.calendarFooterButtonSecondary,
                 pressed ? styles.pressed : null,
               ]}>
-              <Text style={styles.calendarFooterButtonSecondaryText}>Clear</Text>
+              <Text style={styles.calendarFooterButtonSecondaryText}>
+                Clear
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -1404,7 +1435,9 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 styles.calendarFooterButtonSecondary,
                 pressed ? styles.pressed : null,
               ]}>
-              <Text style={styles.calendarFooterButtonSecondaryText}>Cancel</Text>
+              <Text style={styles.calendarFooterButtonSecondaryText}>
+                Cancel
+              </Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
@@ -1476,6 +1509,58 @@ const LargeField: React.FC<LargeFieldProps> = ({
         textAlignVertical="top"
         value={value}
       />
+    </View>
+  );
+};
+
+const PropertyStatusField: React.FC<PropertyStatusFieldProps> = ({
+  isActive,
+  onStatusChange,
+}) => {
+  return (
+    <View style={styles.fieldGroup}>
+      <Text style={styles.fieldLabel}>Property Status</Text>
+      <View style={styles.statusButtonRow}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onStatusChange(true)}
+          style={({pressed}) => [
+            styles.statusButton,
+            isActive ? styles.statusButtonActive : null,
+            pressed ? styles.pressed : null,
+          ]}>
+          <Text
+            style={[
+              styles.statusButtonText,
+              isActive ? styles.statusButtonTextActive : null,
+            ]}>
+            Activate
+          </Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onStatusChange(false)}
+          style={({pressed}) => [
+            styles.statusButton,
+            !isActive ? styles.statusButtonInactive : null,
+            pressed ? styles.pressed : null,
+          ]}>
+          <Text
+            style={[
+              styles.statusButtonText,
+              !isActive ? styles.statusButtonTextInactive : null,
+            ]}>
+            Deactivate
+          </Text>
+        </Pressable>
+      </View>
+
+      <Text style={styles.statusSummaryText}>
+        {isActive
+          ? 'This property will stay visible to tenants after you save.'
+          : 'This property will be hidden from tenants after you save, but it will remain in your owner list.'}
+      </Text>
     </View>
   );
 };
@@ -2003,6 +2088,48 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: spacing.xs,
     marginBottom: spacing.sm,
+  },
+  statusButtonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  statusButton: {
+    flex: 1,
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: '#DDD6CF',
+    borderRadius: 10,
+    backgroundColor: '#FAF7F3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  statusButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#EEF6F2',
+  },
+  statusButtonInactive: {
+    borderColor: colors.error,
+    backgroundColor: colors.error,
+  },
+  statusButtonText: {
+    color: colors.textPrimary,
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+  },
+  statusButtonTextActive: {
+    color: colors.primary,
+  },
+  statusButtonTextInactive: {
+    color: colors.white,
+  },
+  statusSummaryText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: spacing.xs + 2,
+    marginLeft: spacing.xs,
   },
   helperText: {
     color: '#7B756E',
