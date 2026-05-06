@@ -45,3 +45,15 @@ cd android
 - Add the privacy policy URL above
 - Complete Data safety, App access, Content rating, and Ads declarations
 - If your Play developer account is a newer personal account, complete the required closed testing period before production
+
+## 8. Play review accounts
+
+Password for all review accounts:
+
+- `PlayReview123!`
+
+Accounts:
+
+- Tenant: `playreview.tenant.20260506@example.com`
+- Owner: `playreview.owner.20260506@example.com`
+- Service provider: `playreview.provider.20260506@example.com`
