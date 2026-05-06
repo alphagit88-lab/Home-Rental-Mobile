@@ -20,6 +20,13 @@ import {PropertyRecord} from './src/services/properties';
 import {SignUpScreen} from './src/screens/SignUpScreen';
 import {colors} from './src/theme';
 import {DashboardVariant, getDashboardVariantForRole} from './src/types/appFlow';
+import {
+  openAccountDeletionPage,
+  openPrivacyPolicy,
+  openReportProblemEmail,
+  openSupportEmail,
+  openTermsOfUse,
+} from './src/utils/externalLinks';
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'loading' | 'login' | 'signup' | 'home'>(
@@ -215,6 +222,21 @@ const App: React.FC = () => {
         <AccountScreen
           activeTab={activeTab}
           onEditProfile={() => setAccountView('editProfile')}
+          onOpenHelp={() => {
+            void openSupportEmail();
+          }}
+          onOpenPrivacyPolicy={() => {
+            void openPrivacyPolicy();
+          }}
+          onOpenTerms={() => {
+            void openTermsOfUse();
+          }}
+          onReportProblem={() => {
+            void openReportProblemEmail();
+          }}
+          onRequestAccountDeletion={() => {
+            void openAccountDeletionPage();
+          }}
           onLogout={() => {
             void clearAuthSession();
             setAccountView('list');

@@ -1,4 +1,4 @@
-rootProject.name = 'New Project'
+rootProject.name = 'Home Rent'
 
 dependencyResolutionManagement {
   versionCatalogs {

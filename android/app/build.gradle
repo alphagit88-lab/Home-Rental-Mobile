@@ -1,8 +1,37 @@
+import java.util.Properties
+
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def releaseSecrets = new Properties()
+def releaseSecretsFile = rootProject.file("release-secrets.properties")
+
+if (releaseSecretsFile.exists()) {
+    releaseSecretsFile.withInputStream { stream ->
+        releaseSecrets.load(stream)
+    }
+}
+
+def resolveSecret = { String key, String fallback = "" ->
+    def projectValue = findProperty(key)
+    if (projectValue != null && projectValue.toString().trim()) {
+        return projectValue.toString().trim()
+    }
+
+    def envValue = System.getenv(key)
+    if (envValue != null && envValue.trim()) {
+        return envValue.trim()
+    }
+
+    def fileValue = releaseSecrets.getProperty(key)
+    if (fileValue != null && fileValue.trim()) {
+        return fileValue.trim()
+    }
+
+    return fallback
+}
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -77,23 +106,25 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.example.newproject'
+    namespace 'com.homerental.mobile'
     defaultConfig {
-        applicationId 'com.example.newproject'
+        applicationId 'com.homerental.mobile'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0.0"
+        resValue "string", "google_maps_api_key", resolveSecret("GOOGLE_MAPS_API_KEY")
 
         buildConfigField("boolean", "REACT_NATIVE_UNSTABLE_USE_RUNTIME_SCHEDULER_ALWAYS", (findProperty("reactNative.unstable_useRuntimeSchedulerAlways") ?: true).toString())
     }
     signingConfigs {
         release {
-            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
-                storeFile file(MYAPP_UPLOAD_STORE_FILE)
-                storePassword MYAPP_UPLOAD_STORE_PASSWORD
-                keyAlias MYAPP_UPLOAD_KEY_ALIAS
-                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            def releaseStoreFile = resolveSecret("APP_UPLOAD_STORE_FILE")
+            if (releaseStoreFile) {
+                storeFile rootProject.file(releaseStoreFile)
+                storePassword resolveSecret("APP_UPLOAD_STORE_PASSWORD")
+                keyAlias resolveSecret("APP_UPLOAD_KEY_ALIAS")
+                keyPassword resolveSecret("APP_UPLOAD_KEY_PASSWORD")
             }
         }
         debug {

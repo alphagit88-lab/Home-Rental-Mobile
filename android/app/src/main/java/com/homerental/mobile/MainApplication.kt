@@ -1,4 +1,4 @@
-package com.example.newproject
+package com.homerental.mobile
 
 import android.app.Application
 import android.content.res.Configuration

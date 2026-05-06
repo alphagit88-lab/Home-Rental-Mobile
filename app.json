@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "New Project",
-    "slug": "new-project",
+    "name": "Home Rent",
+    "slug": "home-rental-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.example.newproject"
+      "package": "com.homerental.mobile"
     },
     "assetBundlePatterns": [
       "**/*"
     ]
   },
-  "name": "NewProject",
-  "displayName": "New Project"
+  "name": "HomeRent",
+  "displayName": "Home Rent"
 }

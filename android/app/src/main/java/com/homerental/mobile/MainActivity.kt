@@ -1,4 +1,4 @@
-package com.example.newproject
+package com.homerental.mobile
 
 import android.os.Build
 import android.os.Bundle

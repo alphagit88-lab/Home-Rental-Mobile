@@ -43,9 +43,10 @@ type UpdateProfileParams = {
 };
 
 // Switch this between 'local' and 'cloudflare' depending on what you want to test.
+// Replace the Cloudflare tunnel URL with your stable production API before release.
 const API_BACKEND_TARGET: BackendTarget = 'cloudflare';
 const CLOUDFLARE_API_BASE_URL =
-  'https://depends-privileges-attention-improving.trycloudflare.com/';
+  'https://mit-tar-measures-onion.trycloudflare.com/';
 
 // Use your machine LAN IP for testing from a physical device on the same network.
 const LOCAL_MANUAL_API_BASE_URL = 'http://192.168.1.103:5001';
@@ -102,9 +103,7 @@ const request = async <T>(
       },
     });
   } catch (error) {
-    throw new Error(
-      `Cannot reach the backend at ${API_BASE_URL}. Check the API config in src/services/rentalAuth.ts.`,
-    );
+    throw new Error('Cannot reach the Home Rent server right now.');
   }
 
   let body: ApiEnvelope<T> | null = null;

@@ -31,6 +31,11 @@ import {colors, fonts, radii, spacing} from '../theme';
 type AccountScreenProps = {
   activeTab: AppTab;
   onEditProfile: () => void;
+  onOpenHelp: () => void;
+  onOpenPrivacyPolicy: () => void;
+  onOpenTerms: () => void;
+  onReportProblem: () => void;
+  onRequestAccountDeletion: () => void;
   onLogout: () => void;
   onTabPress: (tab: AppTab) => void;
 };
@@ -49,6 +54,11 @@ type SettingsSection = {
 export const AccountScreen: React.FC<AccountScreenProps> = ({
   activeTab,
   onEditProfile,
+  onOpenHelp,
+  onOpenPrivacyPolicy,
+  onOpenTerms,
+  onReportProblem,
+  onRequestAccountDeletion,
   onLogout,
   onTabPress,
 }) => {
@@ -63,15 +73,19 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
         {label: 'Edit profile', Icon: EditProfileIcon, onPress: onEditProfile},
         {label: 'Security', Icon: SecurityIcon},
         {label: 'Notifications', Icon: NotificationsIcon},
-        {label: 'Privacy', Icon: PrivacyIcon},
+        {
+          label: 'Privacy Policy',
+          Icon: PrivacyIcon,
+          onPress: onOpenPrivacyPolicy,
+        },
       ],
     },
     {
       title: 'Support & About',
       items: [
-        {label: 'My Subscribtion', Icon: SubscriptionIcon},
-        {label: 'Help & Support', Icon: HelpIcon},
-        {label: 'Terms and Policies', Icon: TermsIcon},
+        {label: 'My Subscription', Icon: SubscriptionIcon},
+        {label: 'Help & Support', Icon: HelpIcon, onPress: onOpenHelp},
+        {label: 'Terms and Policies', Icon: TermsIcon, onPress: onOpenTerms},
       ],
     },
     {
@@ -84,7 +98,12 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
     {
       title: 'Actions',
       items: [
-        {label: 'Report a problem', Icon: ReportProblemIcon},
+        {label: 'Report a problem', Icon: ReportProblemIcon, onPress: onReportProblem},
+        {
+          label: 'Delete account',
+          Icon: FreeUpSpaceIcon,
+          onPress: onRequestAccountDeletion,
+        },
         {label: 'Add account', Icon: AddAccountIcon},
         {label: 'Log out', Icon: LogoutIcon, onPress: onLogout},
       ],
