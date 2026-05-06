@@ -20,7 +20,7 @@ The app now points to these GitHub Pages URLs:
 - Terms: `https://alphagit88-lab.github.io/Home-Rental-Mobile/terms.html`
 - Account deletion: `https://alphagit88-lab.github.io/Home-Rental-Mobile/account-deletion.html`
 
-Before Play submission, enable GitHub Pages for this repository and publish from the `docs/` folder so these URLs are live.
+GitHub Pages is enabled for this repository and publishing from the `review` branch `docs/` folder.
 
 ## 4. Support contact
 
