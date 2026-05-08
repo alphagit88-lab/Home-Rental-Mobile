@@ -2,16 +2,20 @@
   "expo": {
     "name": "Home Rent",
     "slug": "home-rental-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
+    "icon": "./src/assets/images/rent.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.homerental.mobile"
+      "package": "com.homerental.mobile",
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/images/rent.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
     ]
-  },
-  "name": "HomeRent",
-  "displayName": "Home Rent"
+  }
 }

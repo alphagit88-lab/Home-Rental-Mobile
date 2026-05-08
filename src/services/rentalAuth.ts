@@ -46,7 +46,7 @@ type UpdateProfileParams = {
 // Replace the Cloudflare tunnel URL with your stable production API before release.
 const API_BACKEND_TARGET: BackendTarget = 'cloudflare';
 const CLOUDFLARE_API_BASE_URL =
-  'https://mit-tar-measures-onion.trycloudflare.com/';
+  'https://integrity-matching-attributes-router.trycloudflare.com/';
 
 // Use your machine LAN IP for testing from a physical device on the same network.
 const LOCAL_MANUAL_API_BASE_URL = 'http://192.168.1.103:5001';
