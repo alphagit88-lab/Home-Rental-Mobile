@@ -51,7 +51,10 @@ export const ServiceProviderHomeScreen: React.FC<
   const home = useHomeScreen();
   const compactLayout = responsive.isSmallPhone;
   const veryCompactLayout = responsive.isVerySmallPhone;
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const {
     categories: availableCategories,
     errorMessage: availableCategoriesErrorMessage,

@@ -15,7 +15,6 @@ import {
   View,
 } from 'react-native';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import SearchIcon from '../assets/images/search 1.svg';
 import DateIcon from '../assets/images/clarity_date-line.svg';
 import RefreshIcon from '../assets/images/refreshing 1.svg';
@@ -26,6 +25,7 @@ import ParkingIcon from '../assets/images/parking-svgrepo-com.svg';
 import PoolIcon from '../assets/images/swimming-pool-svgrepo-com.svg';
 import CardImage from '../assets/images/image.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {InlineMessage} from '../hooks/useLoginScreen';
 import {useTenantProperties} from '../hooks/useTenantProperties';
@@ -317,7 +317,10 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const {errorMessage, loading, properties, reload} = useTenantProperties();
   const [detailVisible, setDetailVisible] = useState(false);
   const [bookingVisible, setBookingVisible] = useState(false);
@@ -984,15 +987,7 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
         <MenuIcon height={22} width={32} />
       </Pressable>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={onProfilePress}
-        style={styles.profileButton}>
-        <Text style={styles.profileLabel}>{`Hello ${userName}.`}</Text>
-        <View style={styles.profileImageWrap}>
-          <ProfilePic height="100%" width="100%" />
-        </View>
-      </Pressable>
+      <HeaderProfileSwitcher />
     </View>
   );
 };

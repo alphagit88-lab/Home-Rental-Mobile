@@ -35,9 +35,9 @@ import {
 } from '../utils/bookingPresentation';
 import {BookingDetailsScreen} from './BookingDetailsScreen';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import PlayIcon from '../assets/images/20 1.svg';
 import CalendarDropdownIcon from '../assets/images/Vector 13.svg';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 
 type OwnerBookingsScreenProps = {
   activeTab: AppTab;
@@ -55,7 +55,10 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const today = new Date();
   const todayIsoDate = getTodayIsoDate();
   const [selectedYear, setSelectedYear] = useState(today.getUTCFullYear());
@@ -282,15 +285,7 @@ export const OwnerBookingsScreen: React.FC<OwnerBookingsScreenProps> = ({
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             <View style={styles.calendarCard}>

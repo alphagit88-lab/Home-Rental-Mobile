@@ -17,7 +17,7 @@ import { InlineStateMessage } from '../components/InlineStateMessage';
 import { PrimaryActionButton } from '../components/PrimaryActionButton';
 import { useLoginScreen } from '../hooks/useLoginScreen';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, fonts, radii, spacing } from '../theme';
+import { colors, fonts, spacing } from '../theme';
 import { DashboardVariant } from '../types/appFlow';
 import LockIcon from '../assets/images/Lock.svg';
 import MessageIcon from '../assets/images/Message.svg';
@@ -94,24 +94,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 >
                   Sign in
                 </Text>
-
-                <View style={styles.pathSelector}>
-                  <AuthPathButton
-                    active={login.dashboardVariant === 'standard'}
-                    label="Tenant"
-                    onPress={() => login.setDashboardVariant('standard')}
-                  />
-                  <AuthPathButton
-                    active={login.dashboardVariant === 'owner'}
-                    label="Property Owner"
-                    onPress={() => login.setDashboardVariant('owner')}
-                  />
-                  <AuthPathButton
-                    active={login.dashboardVariant === 'serviceProvider'}
-                    label="Service Provider"
-                    onPress={() => login.setDashboardVariant('serviceProvider')}
-                  />
-                </View>
 
                 <View style={styles.fields}>
                   <AuthInput
@@ -227,39 +209,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   );
 };
 
-type AuthPathButtonProps = {
-  active: boolean;
-  label: string;
-  onPress: () => void;
-};
-
-const AuthPathButton: React.FC<AuthPathButtonProps> = ({
-  active,
-  label,
-  onPress,
-}) => {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.pathButton,
-        active && styles.pathButtonActive,
-        pressed && styles.pathButtonPressed,
-      ]}
-    >
-      <Text
-        style={[
-          styles.pathButtonText,
-          active && styles.pathButtonTextActive,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-};
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -287,39 +236,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: fonts.bold,
     marginBottom: spacing.lg,
-  },
-  pathSelector: {
-    width: '100%',
-    flexDirection: 'row',
-    gap: spacing.xs,
-    borderRadius: radii.pill,
-    backgroundColor: '#E9DCC9',
-    padding: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  pathButton: {
-    flex: 1,
-    minHeight: 42,
-    borderRadius: radii.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-  },
-  pathButtonActive: {
-    backgroundColor: colors.primary,
-  },
-  pathButtonPressed: {
-    opacity: 0.88,
-  },
-  pathButtonText: {
-    color: colors.textPrimary,
-    fontFamily: fonts.medium,
-    fontSize: 12,
-    lineHeight: 15,
-    textAlign: 'center',
-  },
-  pathButtonTextActive: {
-    color: colors.white,
   },
   fields: {
     gap: spacing.md,

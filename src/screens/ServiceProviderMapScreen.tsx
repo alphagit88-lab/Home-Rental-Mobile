@@ -97,7 +97,10 @@ export const ServiceProviderMapScreen: React.FC<
 > = ({activeTab, onTabPress}) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const {
     assignedRequests,
     errorMessage: requestsErrorMessage,

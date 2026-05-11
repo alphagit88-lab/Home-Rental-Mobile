@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {useOwnerBookings} from '../hooks/useOwnerBookings';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useOwnerProperties} from '../hooks/useOwnerProperties';
@@ -20,7 +21,6 @@ import {
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import HeroBackground from '../assets/images/Untitled design (3) 1.svg';
 import PlayIcon from '../assets/images/20 1.svg';
 
@@ -43,7 +43,10 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const {
     bookings,
     errorMessage: bookingErrorMessage,
@@ -95,15 +98,7 @@ export const OwnerHomeScreen: React.FC<OwnerHomeScreenProps> = ({
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             <View

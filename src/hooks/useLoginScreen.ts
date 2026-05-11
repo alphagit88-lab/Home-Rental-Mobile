@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { DashboardVariant } from '../types/appFlow';
 import { setAuthSession } from '../services/authSession';
-import {RentalRole, signIn} from '../services/rentalAuth';
+import { signIn } from '../services/rentalAuth';
+import { DashboardVariant } from '../types/appFlow';
 import {getDashboardVariantForRole} from '../types/appFlow';
 
 export type WelcomeContent = {
@@ -35,8 +35,6 @@ export const useLoginScreen = () => {
     status: 'content',
     content: defaultHeroContent,
   });
-  const [dashboardVariant, setDashboardVariant] =
-    useState<DashboardVariant>('standard');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
@@ -94,35 +92,10 @@ export const useLoginScreen = () => {
     setInlineMessage(null);
 
     try {
-      const expectedRole: RentalRole =
-        dashboardVariant === 'owner'
-          ? 'owner'
-          : dashboardVariant === 'serviceProvider'
-            ? 'service_provider'
-            : 'tenant';
       const session = await signIn({
         email: email.trim().toLowerCase(),
         password,
       });
-
-      if (session.user.role !== expectedRole) {
-        setSubmitState('error');
-        setInlineMessage({
-          text: (() => {
-            if (expectedRole === 'owner') {
-              return 'This account is not a Property Owner account. Choose the matching role to continue.';
-            }
-
-            if (expectedRole === 'service_provider') {
-              return 'This account is not a Service Provider account. Choose the matching role to continue.';
-            }
-
-            return 'This account is not a Tenant account. Choose the matching role to continue.';
-          })(),
-          tone: 'error',
-        });
-        return;
-      }
 
       await setAuthSession(session, {
         persist: rememberMe,
@@ -145,7 +118,6 @@ export const useLoginScreen = () => {
 
   return {
     heroState,
-    dashboardVariant,
     email,
     password,
     rememberMe,
@@ -155,7 +127,6 @@ export const useLoginScreen = () => {
     setEmail,
     setPassword,
     setRememberMe,
-    setDashboardVariant,
     setPasswordVisible,
     onForgotPasswordPress,
     onSignUpPress,

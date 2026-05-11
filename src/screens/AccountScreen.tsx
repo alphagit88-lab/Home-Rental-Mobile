@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import EditProfileIcon from '../assets/images/iconamoon_profile-light.svg';
 import SecurityIcon from '../assets/images/material-symbols_privacy-tip-outline.svg';
 import NotificationsIcon from '../assets/images/iconamoon_notification.svg';
@@ -24,6 +23,7 @@ import ReportProblemIcon from '../assets/images/ic_sharp-outlined-flag.svg';
 import AddAccountIcon from '../assets/images/ic_sharp-people-outline.svg';
 import LogoutIcon from '../assets/images/mdi_logout.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
@@ -64,7 +64,10 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
 
   const sections: SettingsSection[] = [
     {
@@ -136,16 +139,7 @@ export const AccountScreen: React.FC<AccountScreenProps> = ({
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text
-                  style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             {sections.map(section => (

@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, SafeAreaView, StyleSheet} from 'react-native';
+import {ActivityIndicator, SafeAreaView, StyleSheet, Text} from 'react-native';
 import {AppTab} from './src/components/AppBottomNav';
 import {AccountScreen} from './src/screens/AccountScreen';
 import {BookingsScreen} from './src/screens/BookingsScreen';
@@ -15,10 +15,18 @@ import {PropertiesScreen} from './src/screens/PropertiesScreen';
 import {ServiceProviderHomeScreen} from './src/screens/ServiceProviderHomeScreen';
 import {ServiceProviderMapScreen} from './src/screens/ServiceProviderMapScreen';
 import {ServiceProviderRequestsScreen} from './src/screens/ServiceProviderRequestsScreen';
-import {clearAuthSession, restoreAuthSession} from './src/services/authSession';
+import {
+  clearAuthSession,
+  getAuthSession,
+  restoreAuthSession,
+} from './src/services/authSession';
+import {
+  configureDashboardMode,
+  useDashboardMode,
+} from './src/services/dashboardMode';
 import {PropertyRecord} from './src/services/properties';
 import {SignUpScreen} from './src/screens/SignUpScreen';
-import {colors} from './src/theme';
+import {colors, fonts, spacing} from './src/theme';
 import {DashboardVariant, getDashboardVariantForRole} from './src/types/appFlow';
 import {
   openAccountDeletionPage,
@@ -29,12 +37,11 @@ import {
 } from './src/utils/externalLinks';
 
 const App: React.FC = () => {
+  const {activeVariant: dashboardVariant, isSwitching} = useDashboardMode();
   const [screen, setScreen] = useState<'loading' | 'login' | 'signup' | 'home'>(
     'loading',
   );
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
-  const [dashboardVariant, setDashboardVariant] =
-    useState<DashboardVariant>('standard');
   const [accountView, setAccountView] = useState<'list' | 'editProfile'>('list');
   const [ownerPropertiesView, setOwnerPropertiesView] = useState<
     'list' | 'create' | 'detail' | 'edit'
@@ -43,7 +50,8 @@ const App: React.FC = () => {
     useState<PropertyRecord | null>(null);
 
   const navigateToHome = (variant: DashboardVariant) => {
-    setDashboardVariant(variant);
+    const session = getAuthSession();
+    configureDashboardMode(session?.user.role, variant);
     setAccountView('list');
     setOwnerPropertiesView('list');
     setSelectedOwnerProperty(null);
@@ -63,7 +71,10 @@ const App: React.FC = () => {
         }
 
         if (session) {
-          setDashboardVariant(getDashboardVariantForRole(session.user.role));
+          configureDashboardMode(
+            session.user.role,
+            getDashboardVariantForRole(session.user.role),
+          );
           setAccountView('list');
           setOwnerPropertiesView('list');
           setSelectedOwnerProperty(null);
@@ -72,9 +83,11 @@ const App: React.FC = () => {
           return;
         }
 
+        configureDashboardMode(null, 'standard');
         setScreen('login');
       } catch {
         if (isMounted) {
+          configureDashboardMode(null, 'standard');
           setScreen('login');
         }
       }
@@ -103,6 +116,15 @@ const App: React.FC = () => {
     return (
       <SafeAreaView style={styles.loadingScreen}>
         <ActivityIndicator color={colors.primary} size="large" />
+      </SafeAreaView>
+    );
+  }
+
+  if (screen === 'home' && isSwitching) {
+    return (
+      <SafeAreaView style={styles.switchingScreen}>
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text style={styles.switchingText}>Switching mode...</Text>
       </SafeAreaView>
     );
   }
@@ -240,7 +262,7 @@ const App: React.FC = () => {
           onLogout={() => {
             void clearAuthSession();
             setAccountView('list');
-            setDashboardVariant('standard');
+            configureDashboardMode(null, 'standard');
             setOwnerPropertiesView('list');
             setSelectedOwnerProperty(null);
             setActiveTab('dashboard');
@@ -302,6 +324,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
+  },
+  switchingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  switchingText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
   },
 });
 

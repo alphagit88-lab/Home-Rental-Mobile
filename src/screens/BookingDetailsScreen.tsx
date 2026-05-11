@@ -313,7 +313,10 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
   viewerRole,
 }) => {
   const responsive = useResponsive();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const session = getAuthSession();
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
   const [paymentDraft, setPaymentDraft] = useState<PaymentDraft>(

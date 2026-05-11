@@ -10,12 +10,12 @@ import {
   View,
 } from 'react-native';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useTenantProperties} from '../hooks/useTenantProperties';
 import {useResponsive} from '../hooks/useResponsive';
 import {colors, fonts, radii, spacing} from '../theme';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import HeroBackground from '../assets/images/Untitled design (3) 1.svg';
 import RectangleBg from '../assets/images/Rectangle 7.svg';
 import JogjaImage from '../assets/images/jogja2 1.svg';
@@ -34,7 +34,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const {errorMessage, loading, properties} = useTenantProperties();
   const featuredProperty = properties[0] ?? null;
 
@@ -64,15 +67,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             <View style={styles.heroCard}>

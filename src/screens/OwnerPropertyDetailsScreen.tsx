@@ -10,11 +10,11 @@ import {
   View,
 } from 'react-native';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import HeroImage from '../assets/images/image.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import MapMarkerIcon from '../assets/images/mdi_map-marker.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {PropertyMapCard} from '../components/PropertyMapCard';
 import {useHomeScreen} from '../hooks/useHomeScreen';
 import {useResponsive} from '../hooks/useResponsive';
@@ -44,7 +44,10 @@ export const OwnerPropertyDetailsScreen: React.FC<
 > = ({activeTab, onBackPress, onEditPropertyPress, onTabPress, property}) => {
   const responsive = useResponsive();
   const home = useHomeScreen();
-  const topInset = Platform.OS === 'android' ? spacing.xs : spacing.md;
+  const topInset =
+    Platform.OS === 'android'
+      ? (StatusBar.currentHeight ?? 0) + spacing.sm
+      : spacing.md;
   const amenities = property.amenities;
 
   return (
@@ -76,15 +79,7 @@ export const OwnerPropertyDetailsScreen: React.FC<
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             <View style={styles.titleRow}>
