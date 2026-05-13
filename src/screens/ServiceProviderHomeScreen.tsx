@@ -10,9 +10,9 @@ import {
   View,
 } from 'react-native';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import HeroBackground from '../assets/images/Untitled design (3) 1.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {InlineStateMessage} from '../components/InlineStateMessage';
 import {InlineMessage} from '../hooks/useLoginScreen';
 import {useHomeScreen} from '../hooks/useHomeScreen';
@@ -151,15 +151,7 @@ export const ServiceProviderHomeScreen: React.FC<
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             <View style={styles.heroCard}>
@@ -553,26 +545,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     justifyContent: 'center',
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  profileImageWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    backgroundColor: '#ECECEC',
-  },
-  profileLabel: {
-    color: colors.textPrimary,
-    fontFamily: fonts.medium,
-    fontSize: 13,
   },
   heroCard: {
     minHeight: 292,

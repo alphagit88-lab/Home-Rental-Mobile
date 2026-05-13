@@ -55,7 +55,7 @@ export const useProviderServiceRequests = (
       setAssignedRequests([]);
       setMarkers([]);
       setServiceAreas([]);
-      setErrorMessage('Sign in as a service provider to load service requests.');
+      setErrorMessage('Sign in to load service requests.');
       setLoading(false);
       return;
     }
@@ -97,7 +97,7 @@ export const useProviderServiceRequests = (
       const session = getAuthSession();
 
       if (!session?.token) {
-        throw new Error('Sign in as a service provider to manage requests.');
+        throw new Error('Sign in to manage service requests.');
       }
 
       setRespondingRequestId(requestId);

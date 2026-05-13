@@ -26,7 +26,7 @@ export const useProviderCategories = (): UseProviderCategoriesResult => {
 
     if (!session?.token) {
       setCategories([]);
-      setErrorMessage('Sign in as a service provider to load your categories.');
+      setErrorMessage('Sign in to load your categories.');
       setLoading(false);
       return;
     }
@@ -57,7 +57,7 @@ export const useProviderCategories = (): UseProviderCategoriesResult => {
     const session = getAuthSession();
 
     if (!session?.token) {
-      throw new Error('Sign in as a service provider to update your categories.');
+      throw new Error('Sign in to update your categories.');
     }
 
     setSaving(true);

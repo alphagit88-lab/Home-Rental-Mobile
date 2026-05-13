@@ -40,7 +40,7 @@ export const useProviderServiceAreas = (): UseProviderServiceAreasResult => {
 
     if (!session?.token) {
       setServiceAreas([]);
-      setErrorMessage('Sign in as a service provider to load your service areas.');
+      setErrorMessage('Sign in to load your service areas.');
       setLoading(false);
       return;
     }
@@ -72,7 +72,7 @@ export const useProviderServiceAreas = (): UseProviderServiceAreasResult => {
       const session = getAuthSession();
 
       if (!session?.token) {
-        throw new Error('Sign in as a service provider to add a service area.');
+        throw new Error('Sign in to add a service area.');
       }
 
       setSaving(true);
@@ -103,7 +103,7 @@ export const useProviderServiceAreas = (): UseProviderServiceAreasResult => {
     const session = getAuthSession();
 
     if (!session?.token) {
-      throw new Error('Sign in as a service provider to delete a service area.');
+      throw new Error('Sign in to delete a service area.');
     }
 
     setDeletingAreaId(serviceAreaId);

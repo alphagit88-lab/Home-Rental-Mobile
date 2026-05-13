@@ -5,8 +5,16 @@ apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+def dotenv = new Properties()
+def dotenvFile = new File(projectRoot, ".env")
 def releaseSecrets = new Properties()
 def releaseSecretsFile = rootProject.file("release-secrets.properties")
+
+if (dotenvFile.exists()) {
+    dotenvFile.withInputStream { stream ->
+        dotenv.load(stream)
+    }
+}
 
 if (releaseSecretsFile.exists()) {
     releaseSecretsFile.withInputStream { stream ->
@@ -23,6 +31,11 @@ def resolveSecret = { String key, String fallback = "" ->
     def envValue = System.getenv(key)
     if (envValue != null && envValue.trim()) {
         return envValue.trim()
+    }
+
+    def dotenvValue = dotenv.getProperty(key)
+    if (dotenvValue != null && dotenvValue.trim()) {
+        return dotenvValue.trim()
     }
 
     def fileValue = releaseSecrets.getProperty(key)

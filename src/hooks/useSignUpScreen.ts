@@ -11,27 +11,18 @@ const defaultHeroContent: WelcomeContent = {
   tagline: 'Smart Home Rent Management.',
 };
 
-const signupRoles = ['Tenant', 'Property Owner', 'Service Provider'];
-
 export const useSignUpScreen = () => {
   const [heroState, setHeroState] = useState<HeroState>({
     status: 'content',
     content: defaultHeroContent,
   });
-  const [signupRoleIndex, setSignupRoleIndex] = useState<number | null>(null);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
-  const dashboardVariant: DashboardVariant =
-    signupRoleIndex !== null && signupRoles[signupRoleIndex] === 'Property Owner'
-      ? 'owner'
-      : signupRoleIndex !== null &&
-          signupRoles[signupRoleIndex] === 'Service Provider'
-        ? 'serviceProvider'
-        : 'standard';
+  const dashboardVariant: DashboardVariant = 'standard';
 
   const onRetryHeroPress = () => {
     setHeroState({
@@ -41,25 +32,9 @@ export const useSignUpScreen = () => {
     setInlineMessage(null);
   };
 
-  const onRolePress = () => {
-    setSignupRoleIndex((current) =>
-      current === null ? 0 : (current + 1) % signupRoles.length,
-    );
-    setInlineMessage(null);
-  };
-
   const onSignUpPress = async (
     onSuccess?: (variant: DashboardVariant) => void,
   ) => {
-    if (signupRoleIndex === null) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please choose whether you are a tenant, property owner, or service provider.',
-        tone: 'error',
-      });
-      return;
-    }
-
     if (!fullName.trim() || !email.trim() || !password.trim()) {
       setSubmitState('error');
       setInlineMessage({
@@ -90,12 +65,7 @@ export const useSignUpScreen = () => {
     setSubmitState('loading');
     setInlineMessage(null);
 
-    const role: RentalRole =
-      signupRoles[signupRoleIndex] === 'Property Owner'
-        ? 'owner'
-        : signupRoles[signupRoleIndex] === 'Service Provider'
-          ? 'service_provider'
-          : 'tenant';
+    const role: RentalRole = 'owner';
 
     try {
       const session = await signUp({
@@ -127,7 +97,6 @@ export const useSignUpScreen = () => {
   return {
     dashboardVariant,
     heroState,
-    signUpAs: signupRoleIndex === null ? '' : signupRoles[signupRoleIndex],
     fullName,
     email,
     password,
@@ -138,7 +107,6 @@ export const useSignUpScreen = () => {
     setEmail,
     setPassword,
     setPasswordVisible,
-    onRolePress,
     onRetryHeroPress,
     onSignUpPress,
   };

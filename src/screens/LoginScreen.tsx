@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -36,6 +37,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 }) => {
   const responsive = useResponsive();
   const login = useLoginScreen();
+  const isSigningIn = login.submitState === 'loading';
+
+  if (isSigningIn) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text style={styles.loadingText}>Signing you in...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -172,7 +184,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <PrimaryActionButton
                   title="Sign In"
-                  loading={login.submitState === 'loading'}
+                  loading={isSigningIn}
                   onPress={() => {
                     void login.onSignInPress(onNavigateToHome);
                   }}
@@ -210,6 +222,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,

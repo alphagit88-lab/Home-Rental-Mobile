@@ -1,16 +1,17 @@
 import {RentalRole} from '../services/rentalAuth';
 
 export type DashboardVariant = 'owner' | 'serviceProvider' | 'standard';
+export const dashboardVariantMenuOrder: DashboardVariant[] = [
+  'standard',
+  'owner',
+  'serviceProvider',
+];
 
 export const getDashboardVariantsForRole = (
   role?: RentalRole | null,
 ): DashboardVariant[] => {
-  if (role === 'owner') {
-    return ['standard', 'owner'];
-  }
-
-  if (role === 'service_provider') {
-    return ['serviceProvider'];
+  if (role) {
+    return dashboardVariantMenuOrder;
   }
 
   return ['standard'];
@@ -19,10 +20,6 @@ export const getDashboardVariantsForRole = (
 export const getDashboardVariantForRole = (
   role: RentalRole,
 ): DashboardVariant => {
-  if (role === 'owner') {
-    return 'owner';
-  }
-
   if (role === 'service_provider') {
     return 'serviceProvider';
   }
@@ -48,20 +45,16 @@ export const formatDashboardVariantGreeting = (variant: DashboardVariant) => {
   }
 
   if (variant === 'serviceProvider') {
-    return 'provider';
+    return 'service provider';
   }
 
   return 'tenant';
 };
 
 export const formatRentalRoleLabel = (role?: RentalRole | null) => {
-  if (role === 'owner') {
-    return 'Property Owner';
+  if (role === undefined || role === null) {
+    return 'Home Rental Account';
   }
 
-  if (role === 'service_provider') {
-    return 'Service Provider';
-  }
-
-  return 'Tenant';
+  return 'Home Rental Account';
 };

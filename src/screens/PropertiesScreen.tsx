@@ -33,7 +33,6 @@ import {useResponsive} from '../hooks/useResponsive';
 import {
   BookingRecord,
   createBooking,
-  payBookingDeposit,
 } from '../services/bookings';
 import {getAuthSession} from '../services/authSession';
 import {PropertyRecord} from '../services/properties';
@@ -75,6 +74,7 @@ type CalendarPickerModalProps = {
   onClear: () => void;
   onClose: () => void;
   onConfirm: (value: string) => void;
+  selectionMode: BookingDateField;
   title: string;
   value: string;
   visible: boolean;
@@ -479,16 +479,21 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
     if (activeBookingDateField === 'checkIn') {
       setBookingDraft(current => {
         const normalizedCurrentCheckOut = normalizeDateString(current.checkOut);
+        const defaultCheckOutValue = addDaysToIsoDate(value, 1);
 
         return {
           ...current,
           checkIn: formattedValue,
           checkOut:
-            normalizedCurrentCheckOut && normalizedCurrentCheckOut <= value
-              ? ''
-              : current.checkOut,
+            normalizedCurrentCheckOut && normalizedCurrentCheckOut > value
+              ? current.checkOut
+              : defaultCheckOutValue
+                ? formatShortDateInput(defaultCheckOutValue)
+                : '',
         };
       });
+      setActiveBookingDateField('checkOut');
+      return;
     }
 
     if (activeBookingDateField === 'checkOut') {
@@ -569,50 +574,28 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
             );
           }
 
-          const cardDigits = paymentDraft.cardNumber.replace(/\D/g, '');
           const nextCreatedBooking = await createBooking(session.token, {
-            cardLast4: cardDigits.length >= 4 ? cardDigits.slice(-4) : null,
             checkIn: normalizedBookingCheckIn,
             checkOut: normalizedBookingCheckOut,
             contactEmail: paymentDraft.email,
             contactName: paymentDraft.fullName,
             guestCount: bookingDraft.guestCount,
-            paymentMethod: 'card',
             propertyId: selectedProperty.id,
             serviceCategoryIds: bookingDraft.serviceCategoryIds,
             serviceNotes: bookingDraft.serviceNotes.trim() || null,
           });
-
-          let nextBooking = nextCreatedBooking;
-          let nextMessage: InlineMessage = {
-            text: 'Booking created successfully. Pay the 20% deposit within 24 hours to keep it active.',
-            tone: 'success',
-          };
-
-          try {
-            nextBooking = await payBookingDeposit(session.token, nextCreatedBooking.id, {
-              cardLast4: cardDigits.length >= 4 ? cardDigits.slice(-4) : null,
-              paymentMethod: 'card',
-            });
-            nextMessage = {
-              text: 'The booking was created and the 20% deposit was paid successfully. You can pay the remaining balance later from this booking.',
-              tone: 'success',
-            };
-          } catch (error) {
-            nextMessage = {
-              text:
-                'The booking was created, but the 20% deposit was not paid yet. Use the button on this booking details page to complete it within 24 hours.',
-              tone: 'error',
-            };
-          }
 
           setBookingDraft(createBookingDraft());
           setPaymentVisible(false);
           setBookingVisible(false);
           setDetailVisible(false);
           setSelectedProperty(null);
-          setCreatedBooking(nextBooking);
-          setCreatedBookingMessage(nextMessage);
+          setCreatedBooking(nextCreatedBooking);
+          setCreatedBookingMessage({
+            text:
+              'Your booking request was sent to the owner. After the owner confirms it, you can pay the 20% deposit from booking details.',
+            tone: 'success',
+          });
         }}
         onTabPress={tab => {
           setPaymentVisible(false);
@@ -948,6 +931,7 @@ export const PropertiesScreen: React.FC<PropertiesScreenProps> = ({
           onClear={handleBookingDateClear}
           onClose={closeBookingDatePicker}
           onConfirm={handleBookingDateConfirm}
+          selectionMode={activeBookingDateField ?? 'checkIn'}
           title={
             activeBookingDateField === 'checkOut'
               ? 'Select move-out'
@@ -1044,6 +1028,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
   onClear,
   onClose,
   onConfirm,
+  selectionMode,
   title,
   value,
   visible,
@@ -1068,6 +1053,22 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
 
   const selectedParts = parseStoredDate(selectedValue);
   const calendarDays = buildCalendarGrid(displayYear, displayMonth);
+  const autoCheckOutValue =
+    selectionMode === 'checkIn' && selectedValue
+      ? addDaysToIsoDate(selectedValue, 1)
+      : null;
+  const selectedDateSummary = selectedValue
+    ? selectionMode === 'checkIn' && autoCheckOutValue
+      ? `Move-in: ${formatShortDateInput(selectedValue)}\nMove-out: ${formatShortDateInput(autoCheckOutValue)}`
+      : formatShortDateInput(selectedValue)
+    : 'No date selected';
+  const handleDayPress = (dayValue: string) => {
+    setSelectedValue(dayValue);
+
+    if (selectionMode === 'checkIn') {
+      onConfirm(dayValue);
+    }
+  };
 
   return (
     <Modal
@@ -1153,7 +1154,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                   accessibilityRole="button"
                   disabled={isDisabled}
                   key={`${displayYear}-${displayMonth}-${day}`}
-                  onPress={() => setSelectedValue(dayValue)}
+                  onPress={() => handleDayPress(dayValue)}
                   style={({pressed}) => [
                     styles.calendarDayCell,
                     styles.calendarDayButton,
@@ -1174,9 +1175,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
             })}
           </View>
 
-          <Text style={styles.calendarSelectedText}>
-            {selectedValue ? formatShortDateInput(selectedValue) : 'No date selected'}
-          </Text>
+          <Text style={styles.calendarSelectedText}>{selectedDateSummary}</Text>
 
           <View style={styles.calendarFooter}>
             <Pressable
@@ -1896,7 +1895,9 @@ const styles = StyleSheet.create({
     color: '#6F675F',
     fontFamily: fonts.medium,
     fontSize: 13,
+    lineHeight: 18,
     marginBottom: spacing.md,
+    minHeight: 36,
   },
   calendarFooter: {
     flexDirection: 'row',

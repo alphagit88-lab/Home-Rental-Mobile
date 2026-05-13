@@ -1,16 +1,24 @@
 import React, {useEffect, useState} from 'react';
-import {ActivityIndicator, Pressable, StyleSheet, Text, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {
   setDashboardModeVariant,
   useDashboardMode,
 } from '../services/dashboardMode';
+import {getAuthSession} from '../services/authSession';
 import {colors, fonts, radii, spacing} from '../theme';
-import {
-  DashboardVariant,
-  formatDashboardVariantGreeting,
-  formatDashboardVariantLabel,
-} from '../types/appFlow';
-import ProfilePic from '../assets/images/profile_pic.svg';
+import {DashboardVariant, dashboardVariantMenuOrder} from '../types/appFlow';
+
+const hostProfileImage = require('../assets/images/profile-host.png');
+const tenantProfileImage = require('../assets/images/profile-tenant.png');
+const serviceProfileImage = require('../assets/images/profile-service.png');
+const genericProfileImage = require('../assets/images/profile-generic.png');
 
 const getVariantDescription = (variant: DashboardVariant) => {
   if (variant === 'owner') {
@@ -24,15 +32,46 @@ const getVariantDescription = (variant: DashboardVariant) => {
   return 'Browse homes and book properties';
 };
 
+const getVariantStatusLabel = (variant: DashboardVariant) => {
+  if (variant === 'owner') {
+    return '(Logged as Host)';
+  }
+
+  if (variant === 'serviceProvider') {
+    return '(Logged as service)';
+  }
+
+  return '(Logged as tenant)';
+};
+
+const getVariantSwitcherLabel = (variant: DashboardVariant) => {
+  if (variant === 'owner') {
+    return 'Host';
+  }
+
+  if (variant === 'serviceProvider') {
+    return 'Service';
+  }
+
+  return 'Tenant';
+};
+
+const getVariantProfileImage = (variant: DashboardVariant) => {
+  if (variant === 'owner') {
+    return hostProfileImage;
+  }
+
+  if (variant === 'serviceProvider') {
+    return serviceProfileImage;
+  }
+
+  return tenantProfileImage;
+};
+
 export const HeaderProfileSwitcher: React.FC = () => {
   const [menuVisible, setMenuVisible] = useState(false);
-  const {
-    activeVariant,
-    availableVariants,
-    canSwitchVariant,
-    isSwitching,
-    pendingVariant,
-  } = useDashboardMode();
+  const {activeVariant, isSwitching, pendingVariant} = useDashboardMode();
+  const userDisplayName = getAuthSession()?.user.name.trim() || 'Guest';
 
   useEffect(() => {
     if (isSwitching) {
@@ -45,7 +84,7 @@ export const HeaderProfileSwitcher: React.FC = () => {
       <Pressable
         accessibilityRole="button"
         onPress={() => {
-          if (canSwitchVariant && !isSwitching) {
+          if (!isSwitching) {
             setMenuVisible(current => !current);
           }
         }}
@@ -55,35 +94,57 @@ export const HeaderProfileSwitcher: React.FC = () => {
           pressed ? styles.profileButtonPressed : null,
         ]}>
         <View style={styles.profileTextWrap}>
-          <Text style={styles.profileLabel}>
-            {`Hello ${formatDashboardVariantGreeting(activeVariant)}.`}
+          <Text numberOfLines={1} style={styles.profileName}>
+            {userDisplayName}
+          </Text>
+          <Text numberOfLines={1} style={styles.profileRoleText}>
+            {getVariantStatusLabel(activeVariant)}
           </Text>
           {isSwitching && pendingVariant ? (
             <View style={styles.switchingRow}>
               <ActivityIndicator color={colors.primary} size="small" />
               <Text numberOfLines={1} style={styles.switchingText}>
-                {`Switching to ${formatDashboardVariantLabel(pendingVariant)}...`}
+                {`Switching to ${getVariantSwitcherLabel(pendingVariant)}...`}
               </Text>
             </View>
           ) : null}
         </View>
         <View style={styles.profileImageWrap}>
-          <ProfilePic height="100%" width="100%" />
+          <Image
+            source={getVariantProfileImage(activeVariant)}
+            style={styles.profileImage}
+          />
         </View>
       </Pressable>
 
       {menuVisible ? (
         <View style={styles.menu}>
-          <Text style={styles.menuTitle}>Switch mode</Text>
+          <View style={styles.menuHeader}>
+            <Text style={styles.menuTitle}>Switch mode</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setMenuVisible(false)}
+              style={({pressed}) => [
+                styles.menuHeaderArrowButton,
+                pressed ? styles.menuItemPressed : null,
+              ]}>
+              <Image source={genericProfileImage} style={styles.menuHeaderArrow} />
+            </Pressable>
+          </View>
 
-          {availableVariants.map(variant => {
+          {dashboardVariantMenuOrder.map(variant => {
             const active = variant === activeVariant;
 
             return (
               <Pressable
                 accessibilityRole="button"
+                disabled={active}
                 key={variant}
                 onPress={() => {
+                  if (active) {
+                    return;
+                  }
+
                   setDashboardModeVariant(variant);
                   setMenuVisible(false);
                 }}
@@ -97,7 +158,7 @@ export const HeaderProfileSwitcher: React.FC = () => {
                     styles.menuItemTitle,
                     active ? styles.menuItemTitleActive : null,
                   ]}>
-                  {formatDashboardVariantLabel(variant)}
+                  {getVariantSwitcherLabel(variant)}
                 </Text>
                 <Text
                   style={[
@@ -130,11 +191,19 @@ const styles = StyleSheet.create({
   },
   profileTextWrap: {
     alignItems: 'flex-end',
+    maxWidth: 156,
   },
-  profileLabel: {
+  profileName: {
     color: colors.textPrimary,
-    fontFamily: fonts.medium,
+    fontFamily: fonts.semibold,
     fontSize: 13,
+    lineHeight: 16,
+  },
+  profileRoleText: {
+    color: '#8D877F',
+    fontFamily: fonts.regular,
+    fontSize: 10,
+    lineHeight: 14,
   },
   switchingRow: {
     flexDirection: 'row',
@@ -158,11 +227,15 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     backgroundColor: '#ECECEC',
   },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+  },
   menu: {
     position: 'absolute',
     top: 56,
     right: 0,
-    width: 228,
+    width: 240,
     borderRadius: radii.md,
     backgroundColor: colors.white,
     padding: spacing.sm,
@@ -174,13 +247,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E8DDD0',
   },
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingTop: 2,
+  },
   menuTitle: {
     color: colors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 12,
-    marginBottom: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    paddingTop: 2,
+  },
+  menuHeaderArrowButton: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuHeaderArrow: {
+    width: 12,
+    height: 10,
   },
   menuItem: {
     borderRadius: 14,

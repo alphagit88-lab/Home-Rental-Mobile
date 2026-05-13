@@ -162,6 +162,11 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                   The owner needs to add the monthly rent before this property
                   can be booked.
                 </Text>
+              ) : canStartBooking ? (
+                <Text style={styles.bookingHelpText}>
+                  Send a booking request first. The owner needs to confirm it
+                  before you can pay the deposit.
+                </Text>
               ) : null}
 
               <Pressable
@@ -176,7 +181,7 @@ export const PropertyDetailsScreen: React.FC<PropertyDetailsScreenProps> = ({
                   {!hasRentConfigured
                     ? 'PRICE REQUIRED'
                     : isBookable
-                      ? 'BOOK NOW'
+                      ? 'REQUEST BOOKING'
                       : 'NOT AVAILABLE'}
                 </Text>
               </Pressable>
@@ -365,7 +370,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   bookingHelpText: {
-    color: colors.error,
+    color: colors.textSecondary,
     fontFamily: fonts.medium,
     fontSize: 13,
     lineHeight: 20,

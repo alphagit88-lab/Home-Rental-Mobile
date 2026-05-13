@@ -8,10 +8,6 @@ export type PropertyBookingDraft = {
 };
 
 export type BookingPaymentDraft = {
-  cardHolderName: string;
-  cardNumber: string;
-  cvv: string;
   email: string;
-  expiryDate: string;
   fullName: string;
 };

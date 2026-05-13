@@ -32,6 +32,8 @@ import {
   formatCalendarDate,
   getLaterIsoDate,
   getTodayIsoDate,
+  isDateWithinBookingRange,
+  iterateStayDates,
   monthLabels,
   parseCalendarDate,
   weekdayLabels,
@@ -49,9 +51,7 @@ type PropertyBookingScreenProps = {
   onBack: () => void;
   onNext: () => void;
   onTabPress: (tab: AppTab) => void;
-  onUpdateBookingDraft: (
-    updates: Partial<PropertyBookingDraft>,
-  ) => void;
+  onUpdateBookingDraft: (updates: Partial<PropertyBookingDraft>) => void;
   property: PropertyRecord;
 };
 
@@ -68,15 +68,22 @@ type SummaryRowProps = {
 
 type BookingDateField = 'checkIn' | 'checkOut';
 
+type CalendarRangeSelection = {
+  checkIn: string;
+  checkOut: string;
+};
+
 type CalendarPickerModalProps = {
   blockedDates: Set<string>;
-  maximumValue?: string | null;
-  minimumValue?: string | null;
-  onClear: () => void;
+  initialCheckInValue: string;
+  initialCheckOutValue: string;
+  maximumCheckInValue?: string | null;
+  maximumCheckOutValue?: string | null;
+  minimumCheckInValue?: string | null;
   onClose: () => void;
-  onConfirm: (value: string) => void;
+  onConfirm: (value: CalendarRangeSelection) => void;
+  selectionMode: BookingDateField;
   title: string;
-  value: string;
   visible: boolean;
 };
 
@@ -111,9 +118,47 @@ const getInitialCalendarState = (
       parsedDate?.monthIndex ??
       fallbackDate?.monthIndex ??
       currentDate.getMonth(),
-    selectedValue: parsedDate ? normalizedValue ?? '' : '',
+    selectedValue: parsedDate ? (normalizedValue ?? '') : '',
     year: parsedDate?.year ?? fallbackDate?.year ?? currentDate.getFullYear(),
   };
+};
+
+const getInitialFocusedField = (
+  preferredField: BookingDateField,
+  checkInValue: string,
+) =>
+  preferredField === 'checkOut' && normalizeDateString(checkInValue)
+    ? 'checkOut'
+    : 'checkIn';
+
+const formatCalendarPreviewPrimary = (value?: string | null) => {
+  const normalizedValue = normalizeDateString(value);
+
+  if (!normalizedValue) {
+    return 'Add date';
+  }
+
+  const parsedDate = new Date(`${normalizedValue}T00:00:00Z`);
+
+  return parsedDate.toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+  });
+};
+
+const formatCalendarPreviewSecondary = (value?: string | null) => {
+  const normalizedValue = normalizeDateString(value);
+
+  if (!normalizedValue) {
+    return 'Choose from the calendar';
+  }
+
+  const parsedDate = new Date(`${normalizedValue}T00:00:00Z`);
+
+  return parsedDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+  });
 };
 
 export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
@@ -126,7 +171,9 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   property,
 }) => {
   const responsive = useResponsive();
-  const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
+  const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(
+    null,
+  );
   const [activeBookingDateField, setActiveBookingDateField] =
     useState<BookingDateField | null>(null);
   const todayIsoDate = getTodayIsoDate();
@@ -137,8 +184,9 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
   const minimumCheckInDate = normalizedPropertyAvailableFrom
     ? getLaterIsoDate(todayIsoDate, normalizedPropertyAvailableFrom)
     : todayIsoDate;
-  const maximumCheckInDate =
-    getLatestPropertyCheckInDate(normalizedPropertyAvailableTo);
+  const maximumCheckInDate = getLatestPropertyCheckInDate(
+    normalizedPropertyAvailableTo,
+  );
   const hasBookableStayDates = hasPropertyBookableStayDates(
     property.availableFrom,
     property.availableTo,
@@ -167,10 +215,8 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
     [availability?.bookedDates],
   );
   const normalizedCheckInDate = normalizeDateString(bookingDraft.checkIn) ?? '';
-  const normalizedCheckOutDate = normalizeDateString(bookingDraft.checkOut) ?? '';
-  const minimumCheckOutDate = normalizedCheckInDate
-    ? addDaysToIsoDate(normalizedCheckInDate, 1) ?? minimumCheckInDate
-    : addDaysToIsoDate(minimumCheckInDate, 1) ?? minimumCheckInDate;
+  const normalizedCheckOutDate =
+    normalizeDateString(bookingDraft.checkOut) ?? '';
 
   const toggleServiceCategory = (categoryId: number) => {
     const nextCategoryIds = bookingDraft.serviceCategoryIds.includes(categoryId)
@@ -195,26 +241,6 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
       return;
     }
 
-    if (field === 'checkOut' && !normalizedCheckInDate) {
-      setInlineMessage({
-        text: 'Please select the check-in date first.',
-        tone: 'error',
-      });
-      return;
-    }
-
-    if (
-      field === 'checkOut' &&
-      normalizedPropertyAvailableTo &&
-      minimumCheckOutDate > normalizedPropertyAvailableTo
-    ) {
-      setInlineMessage({
-        text: 'Please choose an earlier check-in date before selecting check-out.',
-        tone: 'error',
-      });
-      return;
-    }
-
     setInlineMessage(null);
     setActiveBookingDateField(field);
   };
@@ -223,68 +249,70 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
     setActiveBookingDateField(null);
   };
 
-  const handleBookingDateConfirm = (value: string) => {
-    if (!value) {
+  const handleBookingDateConfirm = ({
+    checkIn,
+    checkOut,
+  }: CalendarRangeSelection) => {
+    const normalizedSelectedCheckIn = normalizeDateString(checkIn) ?? '';
+    const normalizedSelectedCheckOut = normalizeDateString(checkOut) ?? '';
+
+    if (!normalizedSelectedCheckIn || !normalizedSelectedCheckOut) {
       setInlineMessage({
-        text: 'Please select a date from the calendar.',
+        text: 'Please choose both a check-in and check-out date.',
         tone: 'error',
       });
       return;
     }
 
-    const formattedValue = formatShortDateInput(value);
+    const minimumSelectedCheckOut = addDaysToIsoDate(
+      normalizedSelectedCheckIn,
+      1,
+    );
 
-    if (activeBookingDateField === 'checkIn') {
-      onUpdateBookingDraft({
-        checkIn: formattedValue,
-        checkOut:
-          normalizedCheckOutDate &&
-          (normalizedCheckOutDate <= value ||
-            doesDateRangeIntersectBlockedDates(
-              value,
-              normalizedCheckOutDate,
-              blockedDates,
-            ))
-            ? ''
-            : bookingDraft.checkOut,
+    if (
+      !minimumSelectedCheckOut ||
+      normalizedSelectedCheckOut < minimumSelectedCheckOut
+    ) {
+      setInlineMessage({
+        text: 'Check-out must be at least one day after check-in.',
+        tone: 'error',
       });
-      setInlineMessage(null);
-      closeBookingDatePicker();
       return;
     }
 
-    if (activeBookingDateField === 'checkOut') {
-      if (
-        !normalizedCheckInDate ||
-        value <= normalizedCheckInDate ||
-        doesDateRangeIntersectBlockedDates(
-          normalizedCheckInDate,
-          value,
-          blockedDates,
-        )
-      ) {
-        setInlineMessage({
-          text: 'Please choose a valid check-out date after check-in.',
-          tone: 'error',
-        });
-        return;
-      }
-
-      onUpdateBookingDraft({checkOut: formattedValue});
-      setInlineMessage(null);
-      closeBookingDatePicker();
-    }
-  };
-
-  const handleBookingDateClear = () => {
-    if (activeBookingDateField === 'checkIn') {
-      onUpdateBookingDraft({checkIn: '', checkOut: ''});
+    if (
+      normalizedSelectedCheckIn < minimumCheckInDate ||
+      (maximumCheckInDate && normalizedSelectedCheckIn > maximumCheckInDate) ||
+      (normalizedPropertyAvailableTo &&
+        normalizedSelectedCheckOut > normalizedPropertyAvailableTo)
+    ) {
+      setInlineMessage({
+        text: 'The selected dates are outside the property availability range.',
+        tone: 'error',
+      });
+      return;
     }
 
-    if (activeBookingDateField === 'checkOut') {
-      onUpdateBookingDraft({checkOut: ''});
+    if (
+      blockedDates.has(normalizedSelectedCheckIn) ||
+      blockedDates.has(normalizedSelectedCheckOut) ||
+      doesDateRangeIntersectBlockedDates(
+        normalizedSelectedCheckIn,
+        normalizedSelectedCheckOut,
+        blockedDates,
+      )
+    ) {
+      setInlineMessage({
+        text: 'Some of the selected dates are already booked.',
+        tone: 'error',
+      });
+      return;
     }
 
+    onUpdateBookingDraft({
+      checkIn: formatShortDateInput(normalizedSelectedCheckIn),
+      checkOut: formatShortDateInput(normalizedSelectedCheckOut),
+    });
     setInlineMessage(null);
     closeBookingDatePicker();
   };
@@ -385,27 +413,30 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
                 <Text style={styles.summaryAddress}>
                   {property.locationText || 'Location unavailable'}
                 </Text>
-                <Text style={styles.summaryAddress}>{property.propertyCode}</Text>
+                <Text style={styles.summaryAddress}>
+                  {property.propertyCode}
+                </Text>
               </View>
             </View>
 
             <View style={styles.noticeCard}>
               <Text style={styles.noticeTitle}>Booking request</Text>
               <Text style={styles.noticeText}>
-                Add your preferred stay dates and guest count before you continue.
+                Add your preferred stay dates and guest count before you send
+                the request to the property owner.
               </Text>
               <Text style={styles.noticeSubtext}>
                 {!hasRentConfigured
                   ? 'This property cannot be booked yet because the monthly rent has not been added.'
                   : !hasBookableStayDates
-                  ? 'This listing is no longer available for a new stay.'
-                  : availabilityLoading
-                  ? 'Loading booked dates for this property...'
-                  : availabilityErrorMessage
-                    ? availabilityErrorMessage
-                    : blockedDates.size > 0
-                      ? 'Booked dates are disabled in the calendar.'
-                      : 'No blocked dates were returned for the current availability window.'}
+                    ? 'This listing is no longer available for a new stay.'
+                    : availabilityLoading
+                      ? 'Loading booked dates for this property...'
+                      : availabilityErrorMessage
+                        ? availabilityErrorMessage
+                        : blockedDates.size > 0
+                          ? 'Booked dates are disabled in the calendar.'
+                          : 'No blocked dates were returned for the current availability window.'}
               </Text>
             </View>
 
@@ -526,10 +557,7 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
             <View style={styles.summaryPanel}>
               <Text style={styles.summaryPanelTitle}>Property Summary</Text>
               <SummaryRow label="Listing Type" value={property.listingType} />
-              <SummaryRow
-                label="Bedrooms"
-                value={String(property.bedrooms)}
-              />
+              <SummaryRow label="Bedrooms" value={String(property.bedrooms)} />
               <SummaryRow
                 label="Bathrooms"
                 value={String(property.bathrooms)}
@@ -578,29 +606,15 @@ export const PropertyBookingScreen: React.FC<PropertyBookingScreenProps> = ({
 
         <CalendarPickerModal
           blockedDates={blockedDates}
-          maximumValue={
-            activeBookingDateField === 'checkOut'
-              ? normalizedPropertyAvailableTo
-              : maximumCheckInDate
-          }
-          minimumValue={
-            activeBookingDateField === 'checkOut'
-              ? minimumCheckOutDate
-              : minimumCheckInDate
-          }
-          onClear={handleBookingDateClear}
+          initialCheckInValue={bookingDraft.checkIn}
+          initialCheckOutValue={bookingDraft.checkOut}
+          maximumCheckInValue={maximumCheckInDate}
+          maximumCheckOutValue={normalizedPropertyAvailableTo}
+          minimumCheckInValue={minimumCheckInDate}
           onClose={closeBookingDatePicker}
           onConfirm={handleBookingDateConfirm}
-          title={
-            activeBookingDateField === 'checkOut'
-              ? 'Select check-out'
-              : 'Select check-in'
-          }
-          value={
-            activeBookingDateField === 'checkOut'
-              ? bookingDraft.checkOut
-              : bookingDraft.checkIn
-          }
+          selectionMode={activeBookingDateField ?? 'checkIn'}
+          title="Select stay dates"
           visible={Boolean(activeBookingDateField)}
         />
 
@@ -636,45 +650,163 @@ const DateInput: React.FC<DateInputProps> = ({label, onPress, value}) => {
 
 const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
   blockedDates,
-  maximumValue,
-  minimumValue,
-  onClear,
+  initialCheckInValue,
+  initialCheckOutValue,
+  maximumCheckInValue,
+  maximumCheckOutValue,
+  minimumCheckInValue,
   onClose,
   onConfirm,
+  selectionMode,
   title,
-  value,
   visible,
 }) => {
+  const initialFocusedField = getInitialFocusedField(
+    selectionMode,
+    initialCheckInValue,
+  );
   const initialCalendarState = getInitialCalendarState(
-    value,
-    minimumValue,
-    maximumValue,
+    initialFocusedField === 'checkOut'
+      ? initialCheckOutValue || initialCheckInValue
+      : initialCheckInValue || initialCheckOutValue,
+    minimumCheckInValue,
+    maximumCheckOutValue,
   );
   const [displayYear, setDisplayYear] = useState(initialCalendarState.year);
-  const [displayMonth, setDisplayMonth] = useState(initialCalendarState.monthIndex);
-  const [selectedValue, setSelectedValue] = useState(
-    initialCalendarState.selectedValue,
+  const [displayMonth, setDisplayMonth] = useState(
+    initialCalendarState.monthIndex,
   );
+  const [draftCheckInValue, setDraftCheckInValue] = useState(
+    normalizeDateString(initialCheckInValue) ?? '',
+  );
+  const [draftCheckOutValue, setDraftCheckOutValue] = useState(
+    normalizeDateString(initialCheckOutValue) ?? '',
+  );
+  const [focusedField, setFocusedField] =
+    useState<BookingDateField>(initialFocusedField);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    const nextCalendarState = getInitialCalendarState(
-      value,
-      minimumValue,
-      maximumValue,
+    const nextFocusedField = getInitialFocusedField(
+      selectionMode,
+      initialCheckInValue,
     );
+    const nextDraftCheckInValue =
+      normalizeDateString(initialCheckInValue) ?? '';
+    const nextDraftCheckOutValue =
+      normalizeDateString(initialCheckOutValue) ?? '';
+    const nextCalendarState = getInitialCalendarState(
+      nextFocusedField === 'checkOut'
+        ? nextDraftCheckOutValue || nextDraftCheckInValue
+        : nextDraftCheckInValue || nextDraftCheckOutValue,
+      minimumCheckInValue,
+      maximumCheckOutValue,
+    );
+
     setDisplayYear(nextCalendarState.year);
     setDisplayMonth(nextCalendarState.monthIndex);
-    setSelectedValue(nextCalendarState.selectedValue);
-  }, [maximumValue, minimumValue, value, visible]);
+    setDraftCheckInValue(nextDraftCheckInValue);
+    setDraftCheckOutValue(nextDraftCheckOutValue);
+    setFocusedField(nextFocusedField);
+  }, [
+    initialCheckInValue,
+    initialCheckOutValue,
+    maximumCheckOutValue,
+    minimumCheckInValue,
+    selectionMode,
+    visible,
+  ]);
 
-  const selectedParts = parseCalendarDate(selectedValue);
   const calendarDays = buildCalendarGrid(displayYear, displayMonth);
-  const normalizedMinimumValue = normalizeDateString(minimumValue) ?? null;
-  const normalizedMaximumValue = normalizeDateString(maximumValue) ?? null;
+  const normalizedMinimumCheckInValue =
+    normalizeDateString(minimumCheckInValue) ?? null;
+  const normalizedMaximumCheckInValue =
+    normalizeDateString(maximumCheckInValue) ?? null;
+  const normalizedMaximumCheckOutValue =
+    normalizeDateString(maximumCheckOutValue) ?? null;
+  const previewCheckInValue = draftCheckInValue;
+  const previewCheckOutValue = draftCheckOutValue;
+  const selectedNightCount =
+    previewCheckInValue && previewCheckOutValue
+      ? iterateStayDates(previewCheckInValue, previewCheckOutValue).length
+      : 0;
+  const selectionSummary =
+    selectedNightCount > 0
+      ? `${selectedNightCount} ${selectedNightCount === 1 ? 'night' : 'nights'}`
+      : focusedField === 'checkOut' && previewCheckInValue
+        ? 'Choose a check-out date'
+        : 'Choose a check-in date';
+  const minimumSelectableCheckOut =
+    previewCheckInValue && focusedField === 'checkOut'
+      ? addDaysToIsoDate(previewCheckInValue, 1)
+      : null;
+
+  const getRetainedCheckOutValue = (
+    nextCheckInValue: string,
+    candidateCheckOutValue: string,
+  ) => {
+    if (!nextCheckInValue || !candidateCheckOutValue) {
+      return '';
+    }
+
+    if (candidateCheckOutValue <= nextCheckInValue) {
+      return '';
+    }
+
+    if (
+      normalizedMaximumCheckOutValue &&
+      candidateCheckOutValue > normalizedMaximumCheckOutValue
+    ) {
+      return '';
+    }
+
+    if (
+      blockedDates.has(candidateCheckOutValue) ||
+      doesDateRangeIntersectBlockedDates(
+        nextCheckInValue,
+        candidateCheckOutValue,
+        blockedDates,
+      )
+    ) {
+      return '';
+    }
+
+    return candidateCheckOutValue;
+  };
+
+  const handleCheckInSelection = (dayValue: string) => {
+    const retainedCheckOutValue = getRetainedCheckOutValue(
+      dayValue,
+      draftCheckOutValue,
+    );
+
+    setDraftCheckInValue(dayValue);
+    setDraftCheckOutValue(retainedCheckOutValue);
+    setFocusedField('checkOut');
+  };
+
+  const handleDayPress = (dayValue: string) => {
+    if (focusedField === 'checkIn') {
+      handleCheckInSelection(dayValue);
+      return;
+    }
+
+    if (!draftCheckInValue || dayValue <= draftCheckInValue) {
+      setDraftCheckInValue(dayValue);
+      setDraftCheckOutValue('');
+      setFocusedField('checkOut');
+      return;
+    }
+
+    setDraftCheckOutValue(dayValue);
+    onConfirm({
+      checkIn: draftCheckInValue,
+      checkOut: dayValue,
+    });
+  };
 
   return (
     <Modal
@@ -683,6 +815,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
       transparent
       visible={visible}>
       <View style={styles.calendarOverlay}>
+        <Pressable onPress={onClose} style={styles.calendarBackdrop} />
         <View style={styles.calendarCard}>
           <Text style={styles.calendarTitle}>{title}</Text>
 
@@ -716,7 +849,9 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
                 onPress={() => setDisplayMonth(index)}
                 style={({pressed}) => [
                   styles.calendarMonthChip,
-                  displayMonth === index ? styles.calendarMonthChipActive : null,
+                  displayMonth === index
+                    ? styles.calendarMonthChipActive
+                    : null,
                   pressed ? styles.dateInputPressed : null,
                 ]}>
                 <Text
@@ -743,38 +878,78 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
           <View style={styles.calendarDayGrid}>
             {calendarDays.map((day, index) => {
               if (day === null) {
-                return <View key={`empty-${index}`} style={styles.calendarDayCell} />;
+                return (
+                  <View key={`empty-${index}`} style={styles.calendarDayCell} />
+                );
               }
 
-              const dayValue = formatCalendarDate(displayYear, displayMonth, day);
-              const isDisabled = Boolean(
-                (normalizedMinimumValue && dayValue < normalizedMinimumValue) ||
-                  (normalizedMaximumValue && dayValue > normalizedMaximumValue) ||
-                  blockedDates.has(dayValue),
+              const dayValue = formatCalendarDate(
+                displayYear,
+                displayMonth,
+                day,
               );
-              const isSelected =
-                selectedParts?.year === displayYear &&
-                selectedParts?.monthIndex === displayMonth &&
-                selectedParts?.day === day;
+              const minimumSelectableValue =
+                focusedField === 'checkOut' && previewCheckInValue
+                  ? minimumSelectableCheckOut
+                  : normalizedMinimumCheckInValue;
+              const maximumSelectableValue =
+                focusedField === 'checkOut' && previewCheckInValue
+                  ? normalizedMaximumCheckOutValue
+                  : normalizedMaximumCheckInValue;
+              const isUnavailableForRange =
+                focusedField === 'checkOut' &&
+                previewCheckInValue &&
+                dayValue > previewCheckInValue &&
+                doesDateRangeIntersectBlockedDates(
+                  previewCheckInValue,
+                  dayValue,
+                  blockedDates,
+                );
+              const isDisabled = Boolean(
+                blockedDates.has(dayValue) ||
+                (minimumSelectableValue && dayValue < minimumSelectableValue) ||
+                (maximumSelectableValue && dayValue > maximumSelectableValue) ||
+                (focusedField === 'checkOut' &&
+                  previewCheckInValue &&
+                  dayValue <= previewCheckInValue) ||
+                isUnavailableForRange,
+              );
+              const isRangeStart = previewCheckInValue === dayValue;
+              const isRangeEnd = previewCheckOutValue === dayValue;
+              const isInRange =
+                previewCheckInValue &&
+                previewCheckOutValue &&
+                isDateWithinBookingRange(
+                  dayValue,
+                  previewCheckInValue,
+                  previewCheckOutValue,
+                );
+              const isHighlighted = isRangeStart || isRangeEnd;
+              const shouldShowDisabledState = isDisabled && !isHighlighted;
 
               return (
                 <Pressable
                   accessibilityRole="button"
                   disabled={isDisabled}
                   key={dayValue}
-                  onPress={() => setSelectedValue(dayValue)}
+                  onPress={() => handleDayPress(dayValue)}
                   style={({pressed}) => [
                     styles.calendarDayCell,
                     styles.calendarDayButton,
-                    isSelected ? styles.calendarDayButtonActive : null,
-                    isDisabled ? styles.calendarDayButtonDisabled : null,
+                    isInRange ? styles.calendarDayButtonInRange : null,
+                    isHighlighted ? styles.calendarDayButtonActive : null,
+                    shouldShowDisabledState
+                      ? styles.calendarDayButtonDisabled
+                      : null,
                     pressed ? styles.dateInputPressed : null,
                   ]}>
                   <Text
                     style={[
                       styles.calendarDayText,
-                      isSelected ? styles.calendarDayTextActive : null,
-                      isDisabled ? styles.calendarDayTextDisabled : null,
+                      isHighlighted ? styles.calendarDayTextActive : null,
+                      shouldShowDisabledState
+                        ? styles.calendarDayTextDisabled
+                        : null,
                     ]}>
                     {String(day)}
                   </Text>
@@ -783,41 +958,65 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({
             })}
           </View>
 
-          <Text style={styles.calendarSelectedText}>
-            {selectedValue ? formatShortDateInput(selectedValue) : 'No date selected'}
-          </Text>
+          <View style={styles.calendarSelectionPanel}>
+            <View style={styles.calendarSelectionHeader}>
+              <Text style={styles.calendarSelectionTitle}>Selected dates</Text>
+              <Text style={styles.calendarSelectionMeta}>
+                {selectionSummary}
+              </Text>
+            </View>
 
-          <View style={styles.calendarFooter}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onClear}
-              style={({pressed}) => [
-                styles.calendarFooterButton,
-                styles.calendarFooterButtonSecondary,
-                pressed ? styles.dateInputPressed : null,
-              ]}>
-              <Text style={styles.calendarFooterButtonSecondaryText}>Clear</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onClose}
-              style={({pressed}) => [
-                styles.calendarFooterButton,
-                styles.calendarFooterButtonSecondary,
-                pressed ? styles.dateInputPressed : null,
-              ]}>
-              <Text style={styles.calendarFooterButtonSecondaryText}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => onConfirm(selectedValue)}
-              style={({pressed}) => [
-                styles.calendarFooterButton,
-                styles.calendarFooterButtonPrimary,
-                pressed ? styles.dateInputPressed : null,
-              ]}>
-              <Text style={styles.calendarFooterButtonPrimaryText}>Apply</Text>
-            </Pressable>
+            <View style={styles.calendarSelectionCardRow}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setFocusedField('checkIn')}
+                style={[
+                  styles.calendarSelectionCard,
+                  focusedField === 'checkIn'
+                    ? styles.calendarSelectionCardActive
+                    : null,
+                ]}>
+                <Text style={styles.calendarSelectionCardLabel}>Check-in</Text>
+                <Text
+                  style={[
+                    styles.calendarSelectionCardValue,
+                    !previewCheckInValue
+                      ? styles.calendarSelectionCardValuePlaceholder
+                      : null,
+                  ]}>
+                  {formatCalendarPreviewPrimary(previewCheckInValue)}
+                </Text>
+                <Text style={styles.calendarSelectionCardSubtext}>
+                  {formatCalendarPreviewSecondary(previewCheckInValue)}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  setFocusedField(previewCheckInValue ? 'checkOut' : 'checkIn')
+                }
+                style={[
+                  styles.calendarSelectionCard,
+                  focusedField === 'checkOut' && previewCheckInValue
+                    ? styles.calendarSelectionCardActive
+                    : null,
+                ]}>
+                <Text style={styles.calendarSelectionCardLabel}>Check-out</Text>
+                <Text
+                  style={[
+                    styles.calendarSelectionCardValue,
+                    !previewCheckOutValue
+                      ? styles.calendarSelectionCardValuePlaceholder
+                      : null,
+                  ]}>
+                  {formatCalendarPreviewPrimary(previewCheckOutValue)}
+                </Text>
+                <Text style={styles.calendarSelectionCardSubtext}>
+                  {formatCalendarPreviewSecondary(previewCheckOutValue)}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </View>
@@ -1144,10 +1343,13 @@ const styles = StyleSheet.create({
   },
   calendarOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(25, 21, 19, 0.34)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.md,
+  },
+  calendarBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(25, 21, 19, 0.34)',
   },
   calendarCard: {
     width: '100%',
@@ -1248,6 +1450,9 @@ const styles = StyleSheet.create({
   calendarDayButton: {
     borderRadius: 12,
   },
+  calendarDayButtonInRange: {
+    backgroundColor: '#E8F0EC',
+  },
   calendarDayButtonActive: {
     backgroundColor: colors.primary,
   },
@@ -1266,39 +1471,73 @@ const styles = StyleSheet.create({
   calendarDayTextDisabled: {
     color: '#B9B1A8',
   },
-  calendarSelectedText: {
+  calendarSelectionPanel: {
+    borderWidth: 1,
+    borderColor: '#EAE4DD',
+    borderRadius: 16,
+    backgroundColor: '#FFFCF7',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  calendarSelectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  calendarSelectionTitle: {
+    color: colors.textPrimary,
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+  },
+  calendarSelectionMeta: {
     color: '#6F675F',
     fontFamily: fonts.medium,
-    fontSize: 13,
-    marginBottom: spacing.md,
+    fontSize: 12,
   },
-  calendarFooter: {
+  calendarSelectionCardRow: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  calendarFooterButton: {
+  calendarSelectionCard: {
     flex: 1,
-    minHeight: 42,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  calendarFooterButtonSecondary: {
     borderWidth: 1,
-    borderColor: '#DDD6CF',
-    backgroundColor: '#FAF7F3',
+    borderColor: '#E6DED5',
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    minHeight: 88,
   },
-  calendarFooterButtonPrimary: {
-    backgroundColor: colors.primary,
+  calendarSelectionCardActive: {
+    borderColor: colors.textPrimary,
+    shadowColor: colors.shadow,
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 2,
   },
-  calendarFooterButtonSecondaryText: {
-    color: colors.textPrimary,
+  calendarSelectionCardLabel: {
+    color: '#7B756E',
     fontFamily: fonts.medium,
-    fontSize: 13,
+    fontSize: 11,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
-  calendarFooterButtonPrimaryText: {
-    color: colors.white,
+  calendarSelectionCardValue: {
+    color: colors.textPrimary,
     fontFamily: fonts.semibold,
-    fontSize: 13,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  calendarSelectionCardValuePlaceholder: {
+    color: '#A29A91',
+  },
+  calendarSelectionCardSubtext: {
+    color: '#6F675F',
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

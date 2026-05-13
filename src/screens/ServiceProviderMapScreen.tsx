@@ -13,8 +13,8 @@ import {
 } from 'react-native';
 import {Region} from 'react-native-maps';
 import MenuIcon from '../assets/images/menu 1.svg';
-import ProfilePic from '../assets/images/profile_pic.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {HeaderProfileSwitcher} from '../components/HeaderProfileSwitcher';
 import {InlineStateMessage} from '../components/InlineStateMessage';
 import {
   OpenStreetMapCircle,
@@ -333,15 +333,7 @@ export const ServiceProviderMapScreen: React.FC<
                 <MenuIcon height={22} width={32} />
               </Pressable>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={home.onProfilePress}
-                style={styles.profileButton}>
-                <Text style={styles.profileLabel}>{`Hello ${home.userName}.`}</Text>
-                <View style={styles.profileImageWrap}>
-                  <ProfilePic height="100%" width="100%" />
-                </View>
-              </Pressable>
+              <HeaderProfileSwitcher />
             </View>
 
             {inlineMessage ? (
@@ -788,26 +780,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     justifyContent: 'center',
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  profileImageWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-    backgroundColor: '#ECECEC',
-  },
-  profileLabel: {
-    color: colors.textPrimary,
-    fontFamily: fonts.medium,
-    fontSize: 13,
   },
   inlineMessageWrap: {
     marginBottom: spacing.md,

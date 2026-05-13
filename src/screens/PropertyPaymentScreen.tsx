@@ -1,28 +1,16 @@
 import React, {useState} from 'react';
 import {
-  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import BottomLineGraphic from '../assets/images/Line (1).svg';
-import MiddleLineGraphic from '../assets/images/Line (2).svg';
-import LineGraphic from '../assets/images/Line.svg';
-import MessageIcon from '../assets/images/Message.svg';
-import CardBackground from '../assets/images/Rectangle 2.3.svg';
-import CardChip from '../assets/images/Rectangle 3.svg';
-import CardOverlay from '../assets/images/Subtract.svg';
-import CardSignalBack from '../assets/images/Vector 2.1.svg';
-import CardSignalFront from '../assets/images/Vector 2.svg';
-import VisaLogo from '../assets/images/visa-pay-logo.svg';
-import ProfileIcon from '../assets/images/iconamoon_profile-light.svg';
 import LeftArrowIcon from '../assets/images/left-arrow 2.svg';
 import {AppBottomNav, AppTab} from '../components/AppBottomNav';
+import {AuthInput} from '../components/AuthInput';
 import {InlineStateMessage} from '../components/InlineStateMessage';
 import {InlineMessage} from '../hooks/useLoginScreen';
 import {useResponsive} from '../hooks/useResponsive';
@@ -36,8 +24,6 @@ import {
   formatPropertyRent,
 } from '../utils/propertyPresentation';
 
-const cardFontFamily = Platform.OS === 'android' ? 'Roboto' : fonts.regular;
-
 type PropertyPaymentScreenProps = {
   activeTab: AppTab;
   bookingDraft: PropertyBookingDraft;
@@ -45,14 +31,6 @@ type PropertyPaymentScreenProps = {
   onBookNow: (paymentDraft: BookingPaymentDraft) => Promise<void>;
   onTabPress: (tab: AppTab) => void;
   property: PropertyRecord;
-};
-
-type InputFieldProps = {
-  icon: React.ReactNode;
-  keyboardType?: 'default' | 'email-address';
-  onChangeText: (value: string) => void;
-  placeholder: string;
-  value: string;
 };
 
 type SummaryRowProps = {
@@ -72,10 +50,6 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
   const session = getAuthSession();
   const [fullName, setFullName] = useState(session?.user.name ?? '');
   const [email, setEmail] = useState(session?.user.email ?? '');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardHolderName, setCardHolderName] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [cvv, setCvv] = useState('');
   const [submitState, setSubmitState] = useState<'idle' | 'loading' | 'error'>(
     'idle',
   );
@@ -89,27 +63,6 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
     property.monthlyRent === null || depositAmount === null
       ? null
       : Number((property.monthlyRent - depositAmount).toFixed(2));
-
-  const handleCardNumberChange = (value: string) => {
-    const digitsOnly = value.replace(/\D/g, '').slice(0, 16);
-    const formattedValue = digitsOnly.replace(/(.{4})/g, '$1 ').trim();
-    setCardNumber(formattedValue);
-  };
-
-  const handleExpiryChange = (value: string) => {
-    const digitsOnly = value.replace(/\D/g, '').slice(0, 4);
-
-    if (digitsOnly.length <= 2) {
-      setExpiryDate(digitsOnly);
-      return;
-    }
-
-    setExpiryDate(`${digitsOnly.slice(0, 2)}/${digitsOnly.slice(2)}`);
-  };
-
-  const handleCvvChange = (value: string) => {
-    setCvv(value.replace(/\D/g, '').slice(0, 3));
-  };
 
   const handleBookNowPress = async () => {
     if (!hasRentConfigured) {
@@ -139,52 +92,12 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
       return;
     }
 
-    if (cardNumber.replace(/\D/g, '').length !== 16) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please enter a valid 16-digit card number.',
-        tone: 'error',
-      });
-      return;
-    }
-
-    if (!cardHolderName.trim()) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please enter the card holder name.',
-        tone: 'error',
-      });
-      return;
-    }
-
-    if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate)) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please enter the card expiry date in MM/YY format.',
-        tone: 'error',
-      });
-      return;
-    }
-
-    if (cvv.length !== 3) {
-      setSubmitState('error');
-      setInlineMessage({
-        text: 'Please enter the 3-digit CVV.',
-        tone: 'error',
-      });
-      return;
-    }
-
     setSubmitState('loading');
     setInlineMessage(null);
 
     try {
       await onBookNow({
-        cardHolderName: cardHolderName.trim(),
-        cardNumber,
-        cvv,
         email: email.trim().toLowerCase(),
-        expiryDate,
         fullName: fullName.trim(),
       });
     } catch (error) {
@@ -218,12 +131,12 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 style={styles.backButton}>
                 <LeftArrowIcon height={18} width={18} />
               </Pressable>
-              <Text style={styles.headerTitle}>Payment</Text>
+              <Text style={styles.headerTitle}>Booking Request</Text>
               <View style={styles.headerSpacer} />
             </View>
 
             <View style={styles.paymentSummaryCard}>
-              <Text style={styles.sectionTitle}>Booking Summary</Text>
+              <Text style={styles.sectionTitle}>Request Summary</Text>
               <SummaryRow label="Property" value={property.title} />
               <SummaryRow label="Property code" value={property.propertyCode} />
               <SummaryRow label="Listing type" value={property.listingType} />
@@ -232,11 +145,11 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
                 value={formatPropertyRent(property.monthlyRent)}
               />
               <SummaryRow
-                label="20% deposit now"
+                label="20% deposit after approval"
                 value={formatBookingMoney(depositAmount)}
               />
               <SummaryRow
-                label="Remaining later"
+                label="Remaining after deposit"
                 value={formatBookingMoney(remainingAmount)}
               />
               <SummaryRow
@@ -289,114 +202,36 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
               </View>
             ) : null}
 
-            <InputField
-              icon={<ProfileIcon height={22} width={22} />}
-              onChangeText={setFullName}
-              placeholder="Full name"
-              value={fullName}
-            />
-
-            <InputField
-              icon={<MessageIcon height={20} width={20} />}
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="abc@email.com"
-              value={email}
-            />
-
-            <View style={styles.noticeCard}>
-              <Text style={styles.noticeTitle}>Pay 20% deposit now</Text>
-              <Text style={styles.noticeText}>
-                This step creates the booking and immediately charges the 20%
-                deposit using these card details. The remaining balance can be
-                paid later from the booking details screen, and service
-                provider requests only open after full payment.
-              </Text>
+            <View style={styles.contactCard}>
+              <Text style={styles.sectionTitle}>Contact Details</Text>
+              <View style={styles.formFieldWrap}>
+                <Text style={styles.fieldLabel}>Full name</Text>
+                <AuthInput
+                  autoCapitalize="words"
+                  onChangeText={setFullName}
+                  placeholder="Full name"
+                  value={fullName}
+                />
+              </View>
+              <View style={styles.formFieldWrap}>
+                <Text style={styles.fieldLabel}>Email</Text>
+                <AuthInput
+                  keyboardType="email-address"
+                  onChangeText={setEmail}
+                  placeholder="abc@email.com"
+                  value={email}
+                />
+              </View>
             </View>
 
-            <View style={styles.cardShell}>
-              <CardBackground
-                height="100%"
-                preserveAspectRatio="none"
-                style={styles.cardBackground}
-                width="100%"
-              />
-              <View pointerEvents="none" style={styles.cardOverlayWrap}>
-                <CardOverlay
-                  height="100%"
-                  preserveAspectRatio="none"
-                  width="100%"
-                />
-              </View>
-
-              <View style={styles.cardContent}>
-                <CardChip height={21} style={styles.cardChipBg} width={29} />
-                <CardSignalFront height={21} style={styles.cardSignalFront} width={4} />
-                <CardSignalBack height={21} style={styles.cardSignalBack} width={4} />
-                <VisaLogo height={44} style={styles.cardVisaLogo} width={44} />
-
-                <Text style={[styles.cardMetaLabel, styles.cardNumberLabel]}>
-                  Card Number
-                </Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={handleCardNumberChange}
-                  placeholder="0000 0000 0000 0000"
-                  placeholderTextColor="rgba(255, 255, 255, 0.96)"
-                  selectionColor={colors.white}
-                  style={[styles.cardValueInput, styles.cardNumberInput]}
-                  value={cardNumber}
-                />
-                <View style={styles.cardNumberLine}>
-                  <LineGraphic height="100%" width="100%" />
-                </View>
-
-                <Text style={[styles.cardMetaLabel, styles.cardHolderLabel]}>
-                  Card Holder Name
-                </Text>
-                <TextInput
-                  autoCapitalize="words"
-                  onChangeText={setCardHolderName}
-                  placeholder="Name on card"
-                  placeholderTextColor="rgba(255, 255, 255, 0.96)"
-                  selectionColor={colors.white}
-                  style={[styles.cardValueInput, styles.cardHolderInput]}
-                  value={cardHolderName}
-                />
-                <View style={styles.cardHolderLine}>
-                  <MiddleLineGraphic height="100%" width="100%" />
-                </View>
-
-                <Text style={[styles.cardMetaLabel, styles.expiryLabel]}>
-                  Expiry date
-                </Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={handleExpiryChange}
-                  placeholder="MM/YY"
-                  placeholderTextColor="rgba(255, 255, 255, 0.96)"
-                  selectionColor={colors.white}
-                  style={[styles.cardValueInput, styles.expiryInput]}
-                  value={expiryDate}
-                />
-                <View style={styles.expiryLine}>
-                  <BottomLineGraphic height="100%" width="100%" />
-                </View>
-
-                <Text style={[styles.cardMetaLabel, styles.cvvLabel]}>CVV</Text>
-                <TextInput
-                  keyboardType="number-pad"
-                  onChangeText={handleCvvChange}
-                  placeholder="000"
-                  placeholderTextColor="rgba(255, 255, 255, 0.96)"
-                  selectionColor={colors.white}
-                  style={[styles.cardValueInput, styles.cvvInput]}
-                  value={cvv}
-                />
-                <View style={styles.cvvLine}>
-                  <BottomLineGraphic height="100%" width="100%" />
-                </View>
-              </View>
+            <View style={styles.noticeCard}>
+              <Text style={styles.noticeTitle}>Owner confirmation required</Text>
+              <Text style={styles.noticeText}>
+                This step sends your booking request to the property owner.
+                After the owner confirms it, you can pay the 20% deposit from
+                the booking details screen. Service provider requests will still
+                open only after full payment.
+              </Text>
             </View>
 
             <Pressable
@@ -413,8 +248,8 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
               ]}>
               <Text style={styles.bookNowButtonText}>
                 {submitState === 'loading'
-                  ? 'Paying Deposit...'
-                  : 'Create Booking & Pay 20%'}
+                  ? 'Sending Request...'
+                  : 'Send Booking Request'}
               </Text>
             </Pressable>
           </View>
@@ -423,28 +258,6 @@ export const PropertyPaymentScreen: React.FC<PropertyPaymentScreenProps> = ({
         <AppBottomNav activeTab={activeTab} onTabPress={onTabPress} />
       </View>
     </SafeAreaView>
-  );
-};
-
-const InputField: React.FC<InputFieldProps> = ({
-  icon,
-  keyboardType = 'default',
-  onChangeText,
-  placeholder,
-  value,
-}) => {
-  return (
-    <View style={styles.inputWrap}>
-      <View style={styles.inputIconWrap}>{icon}</View>
-      <TextInput
-        keyboardType={keyboardType}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor="#8B8A9A"
-        style={styles.input}
-        value={value}
-      />
-    </View>
   );
 };
 
@@ -539,29 +352,26 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'right',
   },
-  inputWrap: {
-    minHeight: 54,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#D9D4D0',
+  contactCard: {
     backgroundColor: colors.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm + 6,
+    borderRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
+    shadowColor: colors.shadow,
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: {width: 0, height: 8},
+    elevation: 6,
+    marginBottom: spacing.md,
+  },
+  formFieldWrap: {
     marginBottom: spacing.sm,
   },
-  inputIconWrap: {
-    width: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.xs,
-  },
-  input: {
-    flex: 1,
+  fieldLabel: {
     color: colors.textPrimary,
-    fontFamily: fonts.regular,
-    fontSize: 18,
-    paddingVertical: spacing.sm,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    marginBottom: 6,
   },
   noticeCard: {
     borderRadius: 14,
@@ -583,131 +393,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 12,
     lineHeight: 18,
-  },
-  cardShell: {
-    width: '100%',
-    aspectRatio: 341 / 201,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: spacing.xl,
-  },
-  cardBackground: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  cardOverlayWrap: {
-    position: 'absolute',
-    left: '0.59%',
-    width: '99.41%',
-    height: '73.63%',
-    bottom: 0,
-  },
-  cardContent: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  cardChipBg: {
-    position: 'absolute',
-    left: '4.99%',
-    top: '6.98%',
-  },
-  cardSignalFront: {
-    position: 'absolute',
-    left: '7.18%',
-    top: '7.04%',
-  },
-  cardSignalBack: {
-    position: 'absolute',
-    left: '10.04%',
-    top: '7.04%',
-  },
-  cardVisaLogo: {
-    position: 'absolute',
-    left: '80.65%',
-    top: '2.87%',
-  },
-  cardMetaLabel: {
-    color: 'rgba(255, 255, 255, 0.7)',
-    fontFamily: cardFontFamily,
-    fontSize: 12,
-    lineHeight: 14,
-    position: 'absolute',
-    includeFontPadding: false,
-  },
-  cardValueInput: {
-    color: colors.white,
-    fontFamily: cardFontFamily,
-    fontSize: 12,
-    lineHeight: 14,
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    height: 16,
-    minHeight: 16,
-    position: 'absolute',
-    includeFontPadding: false,
-  },
-  cardNumberLabel: {
-    left: '6.16%',
-    top: '21.8%',
-  },
-  cardNumberInput: {
-    left: '6.16%',
-    top: '30.27%',
-    width: '38.71%',
-    letterSpacing: 0.2,
-  },
-  cardNumberLine: {
-    position: 'absolute',
-    left: '6.16%',
-    right: '7.77%',
-    top: '40.8%',
-    height: 1,
-  },
-  cardHolderLabel: {
-    left: '6.16%',
-    top: '47.7%',
-  },
-  cardHolderInput: {
-    left: '6.16%',
-    top: '56.17%',
-    width: '30%',
-  },
-  cardHolderLine: {
-    position: 'absolute',
-    left: '6.16%',
-    right: '7.77%',
-    top: '66.7%',
-    height: 1,
-  },
-  expiryLabel: {
-    left: '6.16%',
-    top: '73.6%',
-  },
-  expiryInput: {
-    left: '6.16%',
-    top: '82.07%',
-    width: '10%',
-  },
-  expiryLine: {
-    position: 'absolute',
-    left: '6.16%',
-    right: '57.04%',
-    top: '92.4%',
-    height: 1,
-  },
-  cvvLabel: {
-    left: '55.43%',
-    top: '73.6%',
-  },
-  cvvInput: {
-    left: '55.43%',
-    top: '82.07%',
-    width: '8%',
-  },
-  cvvLine: {
-    position: 'absolute',
-    left: '55.43%',
-    right: '7.77%',
-    top: '92.4%',
-    height: 1,
   },
   bookNowButton: {
     minHeight: 54,

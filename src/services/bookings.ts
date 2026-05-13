@@ -393,6 +393,17 @@ const normalizeBooking = (booking: Record<string, unknown>): BookingRecord => {
   };
 };
 
+const normalizeBookingResult = (payload: Record<string, unknown>) => {
+  const booking =
+    payload.booking && typeof payload.booking === 'object'
+      ? (payload.booking as Record<string, unknown>)
+      : payload.rentalBooking && typeof payload.rentalBooking === 'object'
+        ? (payload.rentalBooking as Record<string, unknown>)
+        : payload;
+
+  return normalizeBooking(booking);
+};
+
 const normalizeAvailability = (
   payload: Record<string, unknown>,
 ): PropertyBookingAvailability => {
@@ -554,7 +565,7 @@ export const createBooking = async (
   token: string,
   params: CreateBookingParams,
 ) => {
-  const data = await requestPrivate<{booking: Record<string, unknown>}>(
+  const data = await requestPrivate<Record<string, unknown>>(
     BOOKINGS_API_BASE_PATH,
     token,
     {
@@ -568,7 +579,7 @@ export const createBooking = async (
     'Unable to create your booking.',
   );
 
-  return normalizeBooking(data.booking);
+  return normalizeBookingResult(data);
 };
 
 const payBooking = async (
@@ -577,7 +588,7 @@ const payBooking = async (
   pathSuffix: 'pay-deposit' | 'pay-balance',
   params: BookingPaymentParams = {},
 ) => {
-  const data = await requestPrivate<{booking: Record<string, unknown>}>(
+  const data = await requestPrivate<Record<string, unknown>>(
     `${BOOKINGS_API_BASE_PATH}/${bookingId}/${pathSuffix}`,
     token,
     {
@@ -593,7 +604,7 @@ const payBooking = async (
       : 'Unable to pay the remaining booking amount.',
   );
 
-  return normalizeBooking(data.booking);
+  return normalizeBookingResult(data);
 };
 
 export const payBookingDeposit = async (
@@ -607,6 +618,19 @@ export const payBookingBalance = async (
   bookingId: number,
   params: BookingPaymentParams = {},
 ) => payBooking(token, bookingId, 'pay-balance', params);
+
+export const confirmBooking = async (token: string, bookingId: number) => {
+  const data = await requestPrivate<Record<string, unknown>>(
+    `${BOOKINGS_API_BASE_PATH}/${bookingId}/confirm`,
+    token,
+    {
+      method: 'POST',
+    },
+    'Unable to confirm this booking request.',
+  );
+
+  return normalizeBookingResult(data);
+};
 
 export const getBookingReviews = async (token: string, bookingId: number) => {
   const data = await requestPrivate<{reviews: Record<string, unknown>[]}>(

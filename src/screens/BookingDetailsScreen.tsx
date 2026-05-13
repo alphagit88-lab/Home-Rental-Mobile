@@ -22,6 +22,7 @@ import {getAuthSession} from '../services/authSession';
 import {
   BookingRecord,
   BookingReviewRecord,
+  confirmBooking,
   getBookingReviews,
   payBookingBalance,
   payBookingDeposit,
@@ -38,6 +39,7 @@ import {
   formatBookingServiceRequestSummary,
   formatBookingStatusLabel,
 } from '../utils/bookingPresentation';
+import {BookingChatScreen} from './BookingChatScreen';
 
 type BookingViewerRole = 'tenant' | 'owner';
 
@@ -131,6 +133,23 @@ const getPaymentSectionMessage = (
   }
 
   return 'Payment details are pending.';
+};
+
+const getBookingLifecycleMessage = (
+  booking: BookingRecord,
+  viewerRole: BookingViewerRole,
+) => {
+  if (booking.bookingStatus === 'pending') {
+    return viewerRole === 'tenant'
+      ? 'Your booking request is waiting for the owner to confirm it. Deposit payment becomes available after that confirmation.'
+      : 'This tenant booking request is waiting for your confirmation. Once you confirm it, the tenant can pay the 20% deposit.';
+  }
+
+  if (booking.bookingStatus === 'cancelled') {
+    return 'This booking request is no longer active.';
+  }
+
+  return getPaymentSectionMessage(booking, viewerRole);
 };
 
 const ReviewRatingButton: React.FC<{
@@ -243,7 +262,7 @@ const PaymentModal: React.FC<{
 
           <Text style={styles.modalIntroText}>
             {stage === 'deposit'
-              ? 'This confirms the booking inside the 24-hour deposit window.'
+              ? 'This records the 20% deposit after the owner has confirmed the booking request.'
               : 'This completes the booking payment and activates the service provider flow.'}
           </Text>
 
@@ -325,9 +344,11 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
   const [paymentStep, setPaymentStep] = useState<PaymentStep>('deposit');
   const [paymentSubmitting, setPaymentSubmitting] = useState(false);
+  const [confirmSubmitting, setConfirmSubmitting] = useState(false);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [chatVisible, setChatVisible] = useState(false);
 
   useEffect(() => {
     setInlineMessage(initialMessage);
@@ -348,17 +369,34 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
 
   const canPayDeposit =
     viewerRole === 'tenant' &&
-    booking.paymentStatus === 'deposit_pending' &&
-    booking.bookingStatus !== 'cancelled';
+    booking.bookingStatus === 'confirmed' &&
+    booking.paymentStatus === 'deposit_pending';
   const canPayBalance =
     viewerRole === 'tenant' &&
-    booking.paymentStatus === 'deposit_paid' &&
-    booking.bookingStatus !== 'cancelled';
+    booking.bookingStatus === 'confirmed' &&
+    booking.paymentStatus === 'deposit_paid';
+  const canConfirmBooking =
+    viewerRole === 'owner' && booking.bookingStatus === 'pending';
   const canReview =
     (viewerRole === 'tenant' || viewerRole === 'owner') &&
     booking.bookingStatus === 'completed' &&
     booking.paymentStatus === 'paid';
   const reviewTargetLabel = viewerRole === 'tenant' ? 'owner' : 'tenant';
+  const chatPartnerLabel = viewerRole === 'tenant' ? 'Owner' : 'Tenant';
+  const chatPartnerName =
+    viewerRole === 'tenant'
+      ? booking.ownerName?.trim() || 'Owner'
+      : booking.tenantName?.trim() || 'Tenant';
+
+  if (chatVisible) {
+    return (
+      <BookingChatScreen
+        booking={booking}
+        onBack={() => setChatVisible(false)}
+        viewerRole={viewerRole}
+      />
+    );
+  }
 
   const handleOpenPayment = (stage: PaymentStep) => {
     setPaymentStep(stage);
@@ -450,6 +488,40 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
       });
     } finally {
       setPaymentSubmitting(false);
+    }
+  };
+
+  const handleConfirmBooking = async () => {
+    const token = session?.token;
+
+    if (!token) {
+      setInlineMessage({
+        text: 'Sign in again to confirm this booking request.',
+        tone: 'error',
+      });
+      return;
+    }
+
+    setConfirmSubmitting(true);
+    setInlineMessage(null);
+
+    try {
+      const updatedBooking = await confirmBooking(token, booking.id);
+      onBookingUpdated(updatedBooking);
+      setInlineMessage({
+        text: 'Booking request confirmed. The tenant can now pay the 20% deposit.',
+        tone: 'success',
+      });
+    } catch (error) {
+      setInlineMessage({
+        text:
+          error instanceof Error
+            ? error.message
+            : 'Unable to confirm this booking request right now.',
+        tone: 'error',
+      });
+    } finally {
+      setConfirmSubmitting(false);
     }
   };
 
@@ -564,7 +636,7 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
               </View>
 
               <Text style={styles.heroCaption}>
-                {getPaymentSectionMessage(booking, viewerRole)}
+                {getBookingLifecycleMessage(booking, viewerRole)}
               </Text>
             </View>
 
@@ -612,6 +684,27 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
             </View>
 
             <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>{`${chatPartnerLabel} Chat`}</Text>
+              <Text style={styles.chatSectionText}>
+                Messages stay attached to this booking so both sides can coordinate
+                arrival details, questions, and handover updates in one place.
+              </Text>
+
+              <View style={styles.chatPreviewCard}>
+                <Text style={styles.chatPreviewLabel}>Chatting with</Text>
+                <Text style={styles.chatPreviewValue}>{chatPartnerName}</Text>
+                <Text style={styles.chatPreviewMeta}>{booking.bookingCode}</Text>
+              </View>
+
+              <View style={styles.chatActionWrap}>
+                <PrimaryActionButton
+                  onPress={() => setChatVisible(true)}
+                  title={`Open ${chatPartnerLabel} Chat`}
+                />
+              </View>
+            </View>
+
+            <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Payment Plan</Text>
               <View style={styles.summaryList}>
                 <SummaryRow
@@ -651,8 +744,20 @@ export const BookingDetailsScreen: React.FC<BookingDetailsScreenProps> = ({
                 </View>
               ) : null}
 
+              {canConfirmBooking ? (
+                <View style={styles.ownerActionWrap}>
+                  <PrimaryActionButton
+                    loading={confirmSubmitting}
+                    onPress={() => {
+                      void handleConfirmBooking();
+                    }}
+                    title="Confirm Booking Request"
+                  />
+                </View>
+              ) : null}
+
               <Text style={styles.sectionHint}>
-                {getPaymentSectionMessage(booking, viewerRole)}
+                {getBookingLifecycleMessage(booking, viewerRole)}
               </Text>
             </View>
 
@@ -972,12 +1077,50 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
+  ownerActionWrap: {
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
   sectionHint: {
     color: colors.textSecondary,
     fontFamily: fonts.regular,
     fontSize: 13,
     lineHeight: 20,
     marginTop: spacing.sm,
+  },
+  chatSectionText: {
+    color: '#5F574F',
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 20,
+    marginBottom: spacing.sm,
+  },
+  chatPreviewCard: {
+    borderRadius: 14,
+    backgroundColor: '#F8F3EB',
+    borderWidth: 1,
+    borderColor: '#E7DACA',
+    padding: spacing.sm + 2,
+  },
+  chatPreviewLabel: {
+    color: '#7A7068',
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  chatPreviewValue: {
+    color: colors.textPrimary,
+    fontFamily: fonts.bold,
+    fontSize: 17,
+    marginBottom: 2,
+  },
+  chatPreviewMeta: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: 12,
+  },
+  chatActionWrap: {
+    marginTop: spacing.md,
   },
   serviceRequestList: {
     gap: spacing.sm,
