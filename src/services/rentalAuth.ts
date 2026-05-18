@@ -1,4 +1,4 @@
-import {Platform} from 'react-native';
+import { Platform } from 'react-native';
 
 export type RentalRole = 'tenant' | 'owner' | 'service_provider';
 type BackendTarget = 'cloudflare' | 'local';
@@ -20,7 +20,7 @@ type ApiEnvelope<T> = {
   success: boolean;
   message?: string;
   data?: T;
-  errors?: Array<{msg?: string; message?: string}>;
+  errors?: Array<{ msg?: string; message?: string }>;
 };
 
 type SignInParams = {
@@ -46,7 +46,7 @@ type UpdateProfileParams = {
 // Replace the Cloudflare tunnel URL with your stable production API before release.
 const API_BACKEND_TARGET: BackendTarget = 'cloudflare';
 const CLOUDFLARE_API_BASE_URL =
-  'https://integrity-matching-attributes-router.trycloudflare.com/';
+  'https://freegobnb.com';
 
 // Use your machine LAN IP for testing from a physical device on the same network.
 const LOCAL_MANUAL_API_BASE_URL = 'http://192.168.1.103:5001';
@@ -142,7 +142,7 @@ export const signUp = async (params: SignUpParams) =>
   );
 
 export const getCurrentUser = async (token: string) =>
-  request<{user: AuthUser}>(
+  request<{ user: AuthUser }>(
     '/api/rental-auth/me',
     {
       method: 'GET',
@@ -157,7 +157,7 @@ export const updateProfile = async (
   token: string,
   params: UpdateProfileParams,
 ) =>
-  request<{user: AuthUser}>(
+  request<{ user: AuthUser }>(
     '/api/rental-auth/profile',
     {
       method: 'PUT',
@@ -169,4 +169,4 @@ export const updateProfile = async (
     'Unable to update your profile.',
   );
 
-export {API_BASE_URL};
+export { API_BASE_URL };
