@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { setAuthSession } from '../services/authSession';
+import { signIn } from '../services/rentalAuth';
+import { DashboardVariant } from '../types/appFlow';
+import {getDashboardVariantForRole} from '../types/appFlow';
 
 export type WelcomeContent = {
   greeting: string;
@@ -37,20 +41,11 @@ export const useLoginScreen = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [inlineMessage, setInlineMessage] = useState<InlineMessage | null>(null);
-  const signInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (signInTimerRef.current) {
-        clearTimeout(signInTimerRef.current);
-      }
-    };
-  }, []);
 
   const onForgotPasswordPress = () => {
     // TODO: Connect forgot password flow or navigation.
     setInlineMessage({
-      text: 'TODO: Connect forgot password flow.',
+      text: 'Forgot password is not connected yet.',
       tone: 'neutral',
     });
   };
@@ -72,7 +67,9 @@ export const useLoginScreen = () => {
     setInlineMessage(null);
   };
 
-  const onSignInPress = () => {
+  const onSignInPress = async (
+    onSuccess?: (variant: DashboardVariant) => void,
+  ) => {
     if (!email.trim() || !password.trim()) {
       setSubmitState('error');
       setInlineMessage({
@@ -82,17 +79,41 @@ export const useLoginScreen = () => {
       return;
     }
 
-    // TODO: Replace with real sign-in request and backend validation.
+    if (!email.includes('@')) {
+      setSubmitState('error');
+      setInlineMessage({
+        text: 'Please enter a valid email address.',
+        tone: 'error',
+      });
+      return;
+    }
+
     setSubmitState('loading');
     setInlineMessage(null);
 
-    signInTimerRef.current = setTimeout(() => {
+    try {
+      const session = await signIn({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+
+      await setAuthSession(session, {
+        persist: rememberMe,
+      });
+      setSubmitState('idle');
+      setInlineMessage({
+        text: `Welcome back, ${session.user.name}.`,
+        tone: 'success',
+      });
+      onSuccess?.(getDashboardVariantForRole(session.user.role));
+    } catch (error) {
       setSubmitState('error');
       setInlineMessage({
-        text: 'TODO: Connect the sign-in API.',
-        tone: 'neutral',
+        text:
+          error instanceof Error ? error.message : 'Unable to sign in right now.',
+        tone: 'error',
       });
-    }, 1100);
+    }
   };
 
   return {

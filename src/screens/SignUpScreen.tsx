@@ -14,12 +14,11 @@ import { AuthInput } from '../components/AuthInput';
 import { HeroBanner } from '../components/HeroBanner';
 import { InlineStateMessage } from '../components/InlineStateMessage';
 import { PrimaryActionButton } from '../components/PrimaryActionButton';
-import { SelectField } from '../components/SelectField';
 import { useResponsive } from '../hooks/useResponsive';
 import { useSignUpScreen } from '../hooks/useSignUpScreen';
 import { colors, fonts, spacing } from '../theme';
+import { DashboardVariant } from '../types/appFlow';
 import ProfileIcon from '../assets/images/Profile.svg';
-import RoleArrowIcon from '../assets/images/20 1.svg';
 import MessageIcon from '../assets/images/Message.svg';
 import LockIcon from '../assets/images/Lock.svg';
 import HideIcon from '../assets/images/hide.svg';
@@ -28,7 +27,7 @@ import SignUpHeroImage from '../assets/images/Untitled design (3) 1.svg';
 
 type SignUpScreenProps = {
   onNavigateToSignIn?: () => void;
-  onNavigateToHome?: () => void;
+  onNavigateToHome?: (variant: DashboardVariant) => void;
 };
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({
@@ -92,16 +91,11 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                   Sign up
                 </Text>
 
-                <View style={styles.fields}>
-                  <SelectField
-                    height={responsive.inputHeight}
-                    leadingIcon={<ProfileIcon height={18} width={18} />}
-                    onPress={signUp.onRolePress}
-                    placeholder="Sign up as a"
-                    trailingIcon={<RoleArrowIcon height={16} width={16} />}
-                    value={signUp.signUpAs}
-                  />
+                <Text style={styles.helperText}>
+                  One account can switch between Tenant, Owner, and Service Provider.
+                </Text>
 
+                <View style={styles.fields}>
                   <AuthInput
                     autoCapitalize="words"
                     autoCorrect={false}
@@ -149,7 +143,9 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({
                   <PrimaryActionButton
                     title="Sign Up"
                     loading={signUp.submitState === 'loading'}
-                    onPress={() => signUp.onSignUpPress(onNavigateToHome)}
+                    onPress={() => {
+                      void signUp.onSignUpPress(onNavigateToHome);
+                    }}
                     trailingIcon={<ShapeIcon height={12} width={12} />}
                   />
                 </View>
@@ -205,6 +201,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     color: colors.textPrimary,
     fontFamily: fonts.bold,
+    marginBottom: spacing.lg,
+  },
+  helperText: {
+    color: colors.textSecondary,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 19,
     marginBottom: spacing.lg,
   },
   fields: {

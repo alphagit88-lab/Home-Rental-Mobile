@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,7 +18,8 @@ import { InlineStateMessage } from '../components/InlineStateMessage';
 import { PrimaryActionButton } from '../components/PrimaryActionButton';
 import { useLoginScreen } from '../hooks/useLoginScreen';
 import { useResponsive } from '../hooks/useResponsive';
-import { colors, fonts, radii, spacing } from '../theme';
+import { colors, fonts, spacing } from '../theme';
+import { DashboardVariant } from '../types/appFlow';
 import LockIcon from '../assets/images/Lock.svg';
 import MessageIcon from '../assets/images/Message.svg';
 import ShapeIcon from '../assets/images/Shape.svg';
@@ -25,14 +27,27 @@ import HideIcon from '../assets/images/hide.svg';
 import HeroImage from '../assets/images/image.svg';
 
 type LoginScreenProps = {
+  onNavigateToHome?: (variant: DashboardVariant) => void;
   onNavigateToSignUp?: () => void;
 };
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onNavigateToHome,
   onNavigateToSignUp,
 }) => {
   const responsive = useResponsive();
   const login = useLoginScreen();
+  const isSigningIn = login.submitState === 'loading';
+
+  if (isSigningIn) {
+    return (
+      <SafeAreaView style={styles.loadingScreen}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <ActivityIndicator color={colors.primary} size="large" />
+        <Text style={styles.loadingText}>Signing you in...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -169,8 +184,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 
                 <PrimaryActionButton
                   title="Sign In"
-                  loading={login.submitState === 'loading'}
-                  onPress={login.onSignInPress}
+                  loading={isSigningIn}
+                  onPress={() => {
+                    void login.onSignInPress(onNavigateToHome);
+                  }}
                   trailingIcon={<ShapeIcon height={12} width={12} />}
                 />
 
@@ -205,6 +222,18 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    color: colors.textSecondary,
+    fontFamily: fonts.medium,
+    fontSize: 14,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,

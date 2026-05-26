@@ -1,20 +1,21 @@
 {
   "expo": {
-    "name": "New Project",
-    "slug": "new-project",
-    "version": "1.0.0",
+    "name": "Home Rent",
+    "slug": "home-rental-mobile",
+    "version": "1.0.1",
+    "icon": "./src/assets/images/rent.png",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.example.newproject",
-      "permissions": [
-        "android.permission.DETECT_SCREEN_CAPTURE"
-      ]
+      "package": "com.homerental.mobile",
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/images/rent.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "assetBundlePatterns": [
       "**/*"
     ]
-  },
-  "name": "NewProject",
-  "displayName": "New Project"
+  }
 }

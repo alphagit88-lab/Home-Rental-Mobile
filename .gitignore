@@ -12,10 +12,12 @@ web-build/
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+android/release-secrets.properties
 
 # Metro
 .metro-health-check*
@@ -30,6 +32,7 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
