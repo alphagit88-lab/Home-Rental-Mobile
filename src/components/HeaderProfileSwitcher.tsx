@@ -13,7 +13,11 @@ import {
 } from '../services/dashboardMode';
 import {getAuthSession} from '../services/authSession';
 import {colors, fonts, radii, spacing} from '../theme';
-import {DashboardVariant, dashboardVariantMenuOrder} from '../types/appFlow';
+import {
+  DashboardVariant,
+  dashboardVariantMenuOrder,
+  formatDashboardVariantLabel,
+} from '../types/appFlow';
 
 const hostProfileImage = require('../assets/images/profile-host.png');
 const tenantProfileImage = require('../assets/images/profile-tenant.png');
@@ -33,28 +37,11 @@ const getVariantDescription = (variant: DashboardVariant) => {
 };
 
 const getVariantStatusLabel = (variant: DashboardVariant) => {
-  if (variant === 'owner') {
-    return '(Logged as Host)';
-  }
-
-  if (variant === 'serviceProvider') {
-    return '(Logged as service)';
-  }
-
-  return '(Logged as tenant)';
+  return `(Logged as ${formatDashboardVariantLabel(variant)})`;
 };
 
-const getVariantSwitcherLabel = (variant: DashboardVariant) => {
-  if (variant === 'owner') {
-    return 'Host';
-  }
-
-  if (variant === 'serviceProvider') {
-    return 'Service';
-  }
-
-  return 'Tenant';
-};
+const getVariantSwitcherLabel = (variant: DashboardVariant) =>
+  formatDashboardVariantLabel(variant);
 
 const getVariantProfileImage = (variant: DashboardVariant) => {
   if (variant === 'owner') {

@@ -7,6 +7,24 @@ export const dashboardVariantMenuOrder: DashboardVariant[] = [
   'serviceProvider',
 ];
 
+const dashboardVariantLabels: Record<DashboardVariant, string> = {
+  standard: 'Tenant',
+  owner: 'Owner',
+  serviceProvider: 'Service Provider',
+};
+
+const dashboardVariantGreetings: Record<DashboardVariant, string> = {
+  standard: 'tenant',
+  owner: 'owner',
+  serviceProvider: 'service provider',
+};
+
+const rentalRoleLabels: Record<RentalRole, string> = {
+  tenant: 'Tenant',
+  owner: 'Owner',
+  service_provider: 'Service Provider',
+};
+
 export const getDashboardVariantsForRole = (
   role?: RentalRole | null,
 ): DashboardVariant[] => {
@@ -20,6 +38,10 @@ export const getDashboardVariantsForRole = (
 export const getDashboardVariantForRole = (
   role: RentalRole,
 ): DashboardVariant => {
+  if (role === 'owner') {
+    return 'owner';
+  }
+
   if (role === 'service_provider') {
     return 'serviceProvider';
   }
@@ -27,34 +49,16 @@ export const getDashboardVariantForRole = (
   return 'standard';
 };
 
-export const formatDashboardVariantLabel = (variant: DashboardVariant) => {
-  if (variant === 'owner') {
-    return 'Owner';
-  }
+export const formatDashboardVariantLabel = (variant: DashboardVariant) =>
+  dashboardVariantLabels[variant];
 
-  if (variant === 'serviceProvider') {
-    return 'Service Provider';
-  }
-
-  return 'Tenant';
-};
-
-export const formatDashboardVariantGreeting = (variant: DashboardVariant) => {
-  if (variant === 'owner') {
-    return 'owner';
-  }
-
-  if (variant === 'serviceProvider') {
-    return 'service provider';
-  }
-
-  return 'tenant';
-};
+export const formatDashboardVariantGreeting = (variant: DashboardVariant) =>
+  dashboardVariantGreetings[variant];
 
 export const formatRentalRoleLabel = (role?: RentalRole | null) => {
   if (role === undefined || role === null) {
     return 'Home Rental Account';
   }
 
-  return 'Home Rental Account';
+  return rentalRoleLabels[role];
 };
